@@ -16,5 +16,5 @@
 *.ilk
 *.lib
 *.opendb
-../build
-./vs2017/.vs
+build/
+vs2017/.vs/

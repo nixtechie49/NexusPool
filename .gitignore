@@ -8,6 +8,13 @@
 *.pdb
 *.iobj
 *.ipdb
+*.obj
+*.idb
+*.log
+*.tlog
+*.lastbuildstate
 *.ilk
-./build
+*.lib
+*.opendb
+../build
 ./vs2017/.vs

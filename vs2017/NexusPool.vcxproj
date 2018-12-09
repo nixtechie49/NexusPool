@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\config.cpp" />
+    <ClCompile Include="..\src\daemon_connection.cpp" />
     <ClCompile Include="..\src\hash\Keccak-compact64.cpp" />
     <ClCompile Include="..\src\hash\KeccakDuplex.cpp" />
     <ClCompile Include="..\src\hash\KeccakSponge.cpp" />
@@ -32,6 +33,7 @@
   <ItemGroup>
     <ClInclude Include="..\src\base58.h" />
     <ClInclude Include="..\src\config.hpp" />
+    <ClInclude Include="..\src\daemon_connection.hpp" />
     <ClInclude Include="..\src\hash\brg_endian.h" />
     <ClInclude Include="..\src\hash\brg_types.h" />
     <ClInclude Include="..\src\hash\crypto_hash.h" />
@@ -190,7 +192,7 @@
       </PrecompiledHeaderFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <AdditionalIncludeDirectories>..\src\spdlog;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\NexusPool\src\network\asio;..\src\spdlog;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

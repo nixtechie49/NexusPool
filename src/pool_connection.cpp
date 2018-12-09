@@ -7,12 +7,15 @@
 
 namespace nexuspool
 {
-Pool_connection::Pool_connection(network::Connection::Sptr&& connection)
+Pool_connection::Pool_connection(network::Connection::Sptr&& connection, uint32_t min_share)
 	: m_connection{std::move(connection)}
+	, m_logger{ spdlog::get("logger") }
 	, m_ddos{}
 	, m_nxsaddress{""}
 	, m_logged_in{false}
 	, m_isDDOS{true}
+	, m_min_share{min_share}
+	, m_remote_address{""}
 {}
 
 //void Pool_connection::connection_handler(network::Result::Code result, network::Shared_payload&& receive_buffer)
@@ -24,14 +27,17 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 {
 	if ((*receive_buffer).size() < 5)
 	{
-		// log error
+		m_logger->error("Received too small buffer from Connection {0}. Size: {1}", m_remote_address, (*receive_buffer).size());
 		return;
 	}
 
 	Packet packet{ std::move(receive_buffer) };
 	if (!packet.is_valid())
 	{
-		// log invalid packet
+		if (m_isDDOS)
+			m_ddos->rSCORE += 10;
+
+		m_logger->error("Received packet is invalid, Connection: {}", m_remote_address);
 		return;
 	}
 
@@ -53,30 +59,28 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 
 		if (!cAddress.IsValid())
 		{
-			printf("[THREAD] Pool LLP: Bad Account %s\n", ADDRESS.c_str());
+			m_logger->warn("Bad Account {}", ADDRESS);
 			if (m_isDDOS)
 				m_ddos->Ban("Invalid Nexus Address on Login");
 
 			return;
 		}
 
-		std::string ip_address = GetIPAddress();
-
-		printf("[THREAD] Pool Login: %s\t IP:%s\t (%d connections)\n", ADDRESS.c_str(), ip_address.c_str(), Core::STATSCOLLECTOR.GetConnectionCount(ADDRESS));
+		m_logger->info("Pool Login: {0}, ({1} connections)", ADDRESS, numConnections); Core::STATSCOLLECTOR.GetConnectionCount(ADDRESS));
 		if (!Core::AccountDB.HasKey(ADDRESS))
 		{
 			LLD::Account cNewAccount(ADDRESS);
 			Core::AccountDB.UpdateRecord(cNewAccount);
 
-			printf("\n+++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
-			printf("[ACCOUNT] New Account %s\n", ADDRESS.c_str());
-			printf("\n+++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
+			m_logger->info("\n+++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
+			m_logger->info("[ACCOUNT] New Account {}\n", ADDRESS);
+			m_logger->info("\n+++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
 		}
 
 
 		if (IsBannedAccount(ADDRESS))
 		{
-			printf("[ACCOUNT] Account: %s is banned\n", ADDRESS.c_str());
+			m_logger->warn("[ACCOUNT] Account: {} is banned\n", ADDRESS);
 
 			// check to see whether this IP is in the banned IP list
 			// if not then add it so that we can perma ban the IP
@@ -113,7 +117,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		if (m_isDDOS)
 			m_ddos->rSCORE += 10;
 
-		printf("[THREAD] Pool LLP: Not Logged In. Rejected Request.\n");
+		m_logger->warn("Not Logged In. Rejected Request.\n");
 
 		return;
 	}
@@ -139,7 +143,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 network::Shared_payload Pool_connection::serialize_block(LLP::CBlock* block)
 {
 	std::vector<uint8_t> hash = block->GetHash().GetBytes();
-	std::vector<uint8_t> minimum = uint2bytes(Core::nMinimumShare);
+	std::vector<uint8_t> minimum = uint2bytes(m_min_share);
 	std::vector<uint8_t> difficulty = uint2bytes(block->nBits);
 	std::vector<uint8_t> height = uint2bytes(block->nHeight);
 

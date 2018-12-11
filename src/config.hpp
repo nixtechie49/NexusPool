@@ -15,11 +15,13 @@ public:
 	std::string const& get_wallet_ip() const { return m_wallet_ip; }
 	uint16_t get_port() const { return m_port; }
 	uint32_t get_connection_threads() const { return m_connection_threads; }
+	bool get_use_ddos() const { return m_use_ddos; }
 
 	uint32_t get_min_share() const { return m_min_share; }
 
 	std::string const& get_logfile() const { return m_logfile; }
 	std::string const& get_database_type() const { return m_database_type; }
+	std::string const& get_database_file() const { return m_database_file; }
 
 private:
 
@@ -33,6 +35,7 @@ private:
 	int          m_pool_fee;
 	std::string  m_logfile;
 	std::string  m_database_type;
+	std::string  m_database_file;
 
 	std::string  strStatsDBServerIP;
 	int          nStatsDBServerPort;

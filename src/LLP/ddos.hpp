@@ -2,6 +2,7 @@
 #define NEXUS_LLP_DDOS_HPP
 
 #include "timer.hpp"
+#include <spdlog/spdlog.h>
 
 #include <vector>
 #include <memory>
@@ -111,7 +112,7 @@ namespace LLP {
 		{ }
 
 		/** Ban a Connection, and Flush its Scores. **/
-		void Ban(std::string strMessage = "Score Threshold Ban")
+		void Ban(std::shared_ptr<spdlog::logger> logger, std::string strMessage = "Score Threshold Ban")
 		{
 			if (Banned())
 				return;
@@ -124,7 +125,7 @@ namespace LLP {
 
 			BANTIME = (std::max)(TOTALBANS * (rSCORE.Score() + 1) * (cSCORE.Score() + 1), TOTALBANS * 1200u);
 
-			printf("XXXXX DDOS Filter Address = %s cScore = %i rScore = %i Banned for %u Seconds. Violation: %s\n", IPADDRESS.c_str(), cSCORE.Score(), rSCORE.Score(), BANTIME, strMessage.c_str());
+			logger->info("XXXXX DDOS Filter Address = {0} cScore = {1} rScore = {2} Banned for {4} Seconds. Violation: {5}\n", IPADDRESS, cSCORE.Score(), rSCORE.Score(), BANTIME, strMessage);
 
 			cSCORE.Flush();
 			rSCORE.Flush();

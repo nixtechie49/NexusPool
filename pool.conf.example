@@ -13,6 +13,7 @@
 	"logfile" : "pool.log",
 	
 	"database_type" : "sqlite",
+	"database_file" : "nexuspool.db",
 
     "stats_db_server_ip" : "127.0.0.1",
     "stats_db_server_port" : 3306,

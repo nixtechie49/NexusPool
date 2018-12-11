@@ -4,7 +4,7 @@
 #include "network/connection.hpp"
 #include "network/socket.hpp"
 #include "LLP/block.h"
-#include <spdlog.h>
+#include <spdlog/spdlog.h>
 
 #include <list>
 #include <memory>
@@ -19,7 +19,7 @@ namespace nexuspool
 {
 	class Pool_connection;
 
-	class Daemon_connection
+	class Daemon_connection : public std::enable_shared_from_this<Daemon_connection>
 	{
 	public:
 		using Uptr = std::unique_ptr<Daemon_connection>;
@@ -85,7 +85,7 @@ namespace nexuspool
 		network::Socket::Sptr m_socket;
 		network::Connection::Sptr m_connection;		// network connection
 		std::shared_ptr<spdlog::logger> m_logger;
-		std::list<std::shared_ptr<Pool_connection>> m_pool_connections;
+		std::list<std::weak_ptr<Pool_connection>> m_pool_connections;
 	};
 
 }

@@ -23,6 +23,7 @@
     <ClInclude Include="..\src\database\sqlite\sqlite3.h" />
     <ClInclude Include="..\src\database\sqlite_database.hpp" />
     <ClInclude Include="..\src\database\types.hpp" />
+    <ClInclude Include="..\src\database\utils.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\database\sqlite\sqlite3.c" />
@@ -109,6 +110,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <PrecompiledHeaderFile />
+      <AdditionalIncludeDirectories>..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -159,6 +161,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <PrecompiledHeaderFile />
+      <AdditionalIncludeDirectories>..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -1,4 +1,5 @@
 #include "pool_connection.hpp"
+#include "data_registry.hpp"
 #include "LLP/block.h"
 #include "LLP/ddos.hpp"
 #include "packet.hpp"
@@ -7,21 +8,43 @@
 
 namespace nexuspool
 {
-Pool_connection::Pool_connection(network::Connection::Sptr&& connection, uint32_t min_share)
+Pool_connection::Pool_connection(network::Connection::Sptr&& connection, std::shared_ptr<Data_registry> data_registry)
 	: m_connection{std::move(connection)}
+	, m_data_registry{std::move(data_registry)}
 	, m_logger{ spdlog::get("logger") }
 	, m_ddos{}
 	, m_nxsaddress{""}
 	, m_logged_in{false}
-	, m_isDDOS{true}
-	, m_min_share{min_share}
+	, m_isDDOS{ data_registry->get_use_ddos()}
 	, m_remote_address{""}
-{}
+{
+}
 
-//void Pool_connection::connection_handler(network::Result::Code result, network::Shared_payload&& receive_buffer)
-//{
-//
-//}
+network::Connection::Handler Pool_connection::init_connection_handler()
+{
+	return [self = shared_from_this()](network::Result::Code result, network::Shared_payload&& receive_buffer)
+	{
+		if (result == network::Result::connection_declined ||
+			result == network::Result::connection_aborted ||
+			result == network::Result::connection_error)
+		{
+			self->m_logger->error("Connection to {0} was not successful. Result: {1}", self->m_remote_address, result);
+			self->m_connection = nullptr;		// close connection (socket etc)
+		}
+		else if (result == network::Result::connection_ok)
+		{
+			self->m_connection->remote_endpoint().address(self->m_remote_address);
+			self->m_ddos = std::make_unique<LLP::DDOS_Filter>(30, self->m_remote_address);			
+			self->m_logger->info("Connection to {} established", self->m_remote_address);
+			// add to daemon connection to receive blocks
+		}
+		else
+		{	// data received
+			self->process_data(std::move(receive_buffer));
+		}
+
+	};
+}
 
 void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 {
@@ -41,6 +64,16 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		return;
 	}
 
+	//obtain ptr to data_registry
+	auto data_registry = m_data_registry.lock();
+	if (!data_registry)
+	{
+		// can't do anything useful wwithout data registry
+		m_logger->info("Couldn't obtain a ptr to Data_registry");
+		return;
+	}
+	
+
 	if (packet.m_header == Packet::LOGIN)
 	{
 		/** Multiply DDOS Score for Multiple Logins after Successful Login. **/
@@ -55,18 +88,19 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		m_nxsaddress = bytes2string(*packet.m_data);
 		Core::NexusAddress cAddress(m_nxsaddress);
 
+		m_stats.m_address = m_nxsaddress;
 		Core::STATSCOLLECTOR.IncConnectionCount(ADDRESS, GUID);
 
 		if (!cAddress.IsValid())
 		{
 			m_logger->warn("Bad Account {}", ADDRESS);
 			if (m_isDDOS)
-				m_ddos->Ban("Invalid Nexus Address on Login");
+				m_ddos->Ban(m_logger, "Invalid Nexus Address on Login");
 
 			return;
 		}
 
-		m_logger->info("Pool Login: {0}, ({1} connections)", ADDRESS, numConnections); Core::STATSCOLLECTOR.GetConnectionCount(ADDRESS));
+		//m_logger->info("Pool Login: {0}, ({1} connections)", ADDRESS, numConnections); Core::STATSCOLLECTOR.GetConnectionCount(ADDRESS));
 		if (!Core::AccountDB.HasKey(ADDRESS))
 		{
 			LLD::Account cNewAccount(ADDRESS);
@@ -89,7 +123,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 				SaveBannedIPAddress(ip_address);
 			}
 
-			m_ddos->Ban("Account is Banned");
+			m_ddos->Ban(m_logger, "Account is Banned");
 
 			m_logged_in = false;
 
@@ -101,9 +135,9 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			//PS
 			// QUICK HACK these are google cloud and amazon AWS IP ranges which we should allow
 			// so don't add CHECK to debug.log 
-			if (!boost::starts_with(ip_address, "104.") && !boost::starts_with(ip_address, "130.")
-				&& !boost::starts_with(ip_address, "23.") && !boost::starts_with(ip_address, "54.") && !boost::starts_with(ip_address, "52."))
-				printf("[ACCOUNT] Account: CHECK Address: %s  IP: %s\n", ADDRESS.c_str(), ip_address.c_str()); // this allows you to grep the debug.log for CHECK and eyeball the frequency and ip addresses
+			if ((m_remote_address.find("104.") != 0) && (m_remote_address.find("130.") != 0)
+				&& (m_remote_address.find("23.") != 0) && (m_remote_address.find("54.") != 0) && (m_remote_address.find("52.") != 0))
+				m_logger->info("[ACCOUNT] Account: CHECK Address: {0} IP: {1} ", ADDRESS, m_remote_address); // this allows you to grep the debug.log for CHECK and eyeball the frequency and ip addresses      
 
 		}
 		return;
@@ -142,8 +176,14 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 /** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
 network::Shared_payload Pool_connection::serialize_block(LLP::CBlock* block)
 {
+	auto data_registry = m_data_registry.lock();
+	if (!data_registry)
+	{
+		return network::Shared_payload{};
+	}
+
 	std::vector<uint8_t> hash = block->GetHash().GetBytes();
-	std::vector<uint8_t> minimum = uint2bytes(m_min_share);
+	std::vector<uint8_t> minimum = uint2bytes(data_registry->get_min_share());
 	std::vector<uint8_t> difficulty = uint2bytes(block->nBits);
 	std::vector<uint8_t> height = uint2bytes(block->nHeight);
 

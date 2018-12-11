@@ -1,12 +1,15 @@
 #include "server.hpp"
+#include "data_registry.hpp"
 #include "pool_connection.hpp"
 #include "daemon_connection.hpp"
 #include "network/create_component.hpp"
 #include "network/component.hpp"
 
-#include <spdlog.h>
-#include <sinks/stdout_color_sinks.h>
-#include <sinks/rotating_file_sink.h>
+#include "chrono/timer_factory.hpp"
+
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 #include <functional>
 
 namespace nexuspool
@@ -19,6 +22,7 @@ Server::Server()
 
 Server::~Server()
 {
+	m_io_context->stop();
 	// Wait for all threads in the pool to exit.
 	for (std::size_t i = 0; i < m_io_threads.size(); ++i)
 		m_io_threads[i].join();
@@ -44,6 +48,10 @@ bool Server::init()
 	// std::err logger
 	auto console_err = spdlog::stderr_color_mt("console_err");
 
+	// global data registry
+	chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);
+	m_data_registry = std::make_shared<Data_registry>(m_config, std::move(timer_factory));
+	m_data_registry->init();
 
 	// network initialisation
 	m_network_component = network::create_component(m_io_context);
@@ -53,9 +61,7 @@ bool Server::init()
 	m_listen_socket = socket_factory->create_socket(listen_endpoint);
 
 	network::Endpoint local_ep{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
-	m_daemon_connection = std::make_unique<Daemon_connection>(std::move(socket_factory->create_socket(local_ep)));
-
-	// database initialisation
+	m_daemon_connection = std::make_shared<Daemon_connection>(std::move(socket_factory->create_socket(local_ep)));
 
 	return true;
 }
@@ -64,6 +70,7 @@ void Server::run()
 {
 	auto logger = spdlog::get("logger");
 	// Create a pool of threads to run all of the io_services.
+	::asio::executor_work_guard<::asio::io_context::executor_type> work = ::asio::make_work_guard(*m_io_context);
 	std::vector<std::thread> io_threads;
 	for (std::size_t i = 0; i < m_config.get_connection_threads(); ++i)
 	{
@@ -80,8 +87,8 @@ void Server::run()
 	// on listen/accept, save created connection to pool_conenctions and call the connection_handler of created pool connection object
 	network::Socket::Connect_handler socket_handler = [this](network::Connection::Sptr&& connection)
 	{
-		m_pool_connections.push_back(std::make_shared<Pool_connection>(std::move(connection), m_config.get_min_share()));
-		return m_pool_connections.back()->connection_handler;
+		m_pool_connections.push_back(std::make_shared<Pool_connection>(std::move(connection), m_data_registry));
+		return m_pool_connections.back()->init_connection_handler();
 	};
 
 	m_listen_socket->listen(socket_handler);

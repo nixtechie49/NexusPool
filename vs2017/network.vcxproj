@@ -89,7 +89,7 @@
       <LanguageStandard>stdcpp14</LanguageStandard>
       <PrecompiledHeaderFile />
       <PreprocessorDefinitions>ASIO_STANDALONE;ASIO_NO_DEPRECATED;BOOST_DATE_TIME_NO_LIB;BOOST_REGEX_NO_LIB;_WIN32_WINNT=0x0501;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\src\network\asio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\src\network;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

@@ -2,7 +2,6 @@
 #define NEXUSPOOL_SERVER_HPP
 
 #include "config.hpp"
-#include "database/database.hpp"
 
 #include <thread>
 #include <vector>
@@ -13,6 +12,7 @@ namespace nexuspool
 {
 namespace network { class Socket; class Component; }
 
+class Data_registry;
 class Pool_connection;
 class Daemon_connection;
 
@@ -29,7 +29,7 @@ public:
 private:
 
 	std::vector<std::shared_ptr<Pool_connection>> m_pool_connections;
-	std::unique_ptr<Daemon_connection> m_daemon_connection;
+	std::shared_ptr<Daemon_connection> m_daemon_connection;
 
 	std::unique_ptr<network::Component> m_network_component;
 	std::shared_ptr<network::Socket> m_listen_socket;
@@ -38,9 +38,7 @@ private:
 
 	Config m_config;
 
-	database::Database::Uptr m_database;
-
-
+	std::shared_ptr<Data_registry> m_data_registry;
 };
 
 }

@@ -3,6 +3,7 @@
 #define NEXUSPOOL_DATABASE_DATABASE_HPP
 
 #include <memory>
+#include <vector>
 
 namespace nexuspool {
 namespace database {
@@ -23,7 +24,12 @@ public:
 	virtual ~Database() = default;
 
 	virtual bool init() = 0;
+	virtual void close() = 0;
 
+	virtual void load_banned_accounts(std::vector<std::string> & banned_accounts) = 0;
+	virtual void save_banned_accounts(std::vector<std::string> const& banned_accounts) = 0;
+
+	// STATISTICS
 	virtual void update_pool_data(pool_data const& pool_data) = 0;
 
 	// round data

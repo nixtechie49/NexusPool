@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <map>
 
 namespace nexuspool {
 namespace database {
@@ -13,19 +14,19 @@ struct pool_data
 public:
 	pool_data()
 	{
-		nRound = Core::nCurrentRound;
-		nBlockNumber = Core::nBestHeight;
-		nRoundReward = Core::nRoundReward;
-		nTotalShares = Core::TotalWeight();
-		nConnectionCount = Core::nConnections;
+		//nRound = Core::nCurrentRound;
+		//nBlockNumber = Core::nBestHeight;
+		//nRoundReward = Core::nRoundReward;
+		//nTotalShares = Core::TotalWeight();
+		//nConnectionCount = Core::nConnections;
 
 	}
 
-	uint32_t nRound;
-	uint32_t nBlockNumber;
-	uint64_t nRoundReward;
-	uint64_t nTotalShares;
-	uint32_t nConnectionCount;
+	uint32_t m_round;
+	uint32_t m_block_number;
+	uint64_t m_round_reward;
+	uint64_t m_total_shares;
+	uint32_t m_connection_count;
 };
 
 struct account_data
@@ -39,43 +40,59 @@ struct account_data
 
 struct round_data
 {
-	explicit round_data(int round_to_set) : m_round{ round_to_set } {}
+	explicit round_data(uint32_t round_to_set) : m_round{round_to_set} {}
 	round_data()
 	{
-		round = Core::nCurrentRound;
-		nBlockNumber = Core::nBestHeight;
-		hashBlock = Core::hashBlockSubmission.ToString();
-		nRoundReward = Core::nRoundReward;
-		nTotalShares = Core::TotalWeight();
-		strBlockFinder = Core::LAST_ROUND_BLOCKFINDER;
-		bOrphan = false;
-		tBlockFoundTime = time(0);
+		//round = Core::nCurrentRound;
+		//nBlockNumber = Core::nBestHeight;
+		//hashBlock = Core::hashBlockSubmission.ToString();
+		//nRoundReward = Core::nRoundReward;
+		//nTotalShares = Core::TotalWeight();
+		//strBlockFinder = Core::LAST_ROUND_BLOCKFINDER;
+		//bOrphan = false;
+		//tBlockFoundTime = time(0);
 	}
 
 
 	uint32_t m_round;
-	uint32_t nBlockNumber;
-	std::string hashBlock;
-	uint64_t nRoundReward;
-	uint64_t nTotalShares;
-	std::string strBlockFinder;
-	bool bOrphan;
-	time_t tBlockFoundTime;
+	uint32_t m_block_number;
+	std::string m_hash_block;
+	uint64_t m_round_reward;
+	uint64_t m_total_shares;
+	std::string m_block_finder;
+	bool m_orphan;
+	time_t m_block_found_time;
+};
+
+struct connection_miner_data
+{
+	connection_miner_data() : m_pps{0}, m_wps{0}, m_guid{""} 
+	{}
+	explicit connection_miner_data(std::string guid) 
+		: m_pps{0}, m_wps{0}, m_guid{std::move(guid)}
+	{}
+
+	double m_pps, 
+		m_wps;
+	std::string m_guid;
 };
 
 struct connection_data
 {
 public:
 	connection_data() : m_address{""} {}
-	connection_data(std::string address) : m_address{std::move(address)}, LASTSAVETIMER.Start();
-}
+	connection_data(std::string address) : m_address{ std::move(address) }
+	{
+	//	LASTSAVETIMER.Start();
+	}
+
 
 	double GetTotalPPS() const
 	{
 		double PPS = 0;
-		for (std::map<std::string, ConnectionMinerData >::const_iterator iter = MINER_DATA.begin(); iter != MINER_DATA.end(); ++iter)
+		for (auto iter = MINER_DATA.begin(); iter != MINER_DATA.end(); ++iter)
 		{
-			PPS += iter->second.PPS;
+			PPS += iter->second.m_pps;
 		}
 
 		return PPS;
@@ -83,19 +100,19 @@ public:
 	double GetTotalWPS() const
 	{
 		double WPS = 0;
-		for (std::map<std::string, ConnectionMinerData >::const_iterator iter = MINER_DATA.begin(); iter != MINER_DATA.end(); ++iter)
+		for (auto iter = MINER_DATA.begin(); iter != MINER_DATA.end(); ++iter)
 		{
-			WPS += iter->second.WPS;
+			WPS += iter->second.m_wps;
 		}
 
 		return WPS;
 	}
 
 	std::string m_address;
-	std::map<std::string, ConnectionMinerData > MINER_DATA;
+	std::map<std::string, connection_miner_data> MINER_DATA;
 
 	/** Used to track when this connection data was last persisted**/
-	LLP::Timer LASTSAVETIMER;
+	//LLP::Timer LASTSAVETIMER;
 };
 
 struct account_earning_transaction

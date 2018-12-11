@@ -6,7 +6,7 @@
 #include "base58.h"
 #include "utils.hpp"
 
-#include "spdlog.h"
+#include <spdlog/spdlog.h>
 
 namespace nexuspool
 {
@@ -23,23 +23,23 @@ namespace nexuspool
 	bool Daemon_connection::connect(network::Endpoint remote_wallet)
 	{
 		// async
-		auto connection = m_socket->connect(std::move(remote_wallet), [this](network::Result::Code result, network::Shared_payload&& receive_buffer)
+		auto connection = m_socket->connect(std::move(remote_wallet), [self = shared_from_this()](network::Result::Code result, network::Shared_payload&& receive_buffer)
 		{
 			if (result == network::Result::connection_declined ||
 				result == network::Result::connection_aborted ||
 				result == network::Result::connection_error)
 			{
-				m_logger->error("Connection to wallet not sucessful. Result: {}", result);
-				m_connection = nullptr;		// close connection (socket etc)
+				self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
+				self->m_connection = nullptr;		// close connection (socket etc)
 				// retry connect
 			}
 			else if (result == network::Result::connection_ok)
 			{
-				m_logger->info("Connection to wallet established");
+				self->m_logger->info("Connection to wallet established");
 			}
 			else
 			{	// data received
-				process_data(std::move(receive_buffer));
+				self->process_data(std::move(receive_buffer));
 			}
 
 		});

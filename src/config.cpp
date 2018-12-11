@@ -20,6 +20,7 @@ namespace nexuspool
 		, m_pool_fee{1}
 		, m_logfile{""}		// no logfile usage, default
 		, m_database_type{"sqlite"}	// use sqlite as default db
+		, m_database_file{""}
 	{
 		strStatsDBServerIP = "127.0.0.1";
 		nStatsDBServerPort = 3306;
@@ -47,6 +48,7 @@ namespace nexuspool
 
 		std::cout << "Logfile: " << m_logfile << std::endl;
 		std::cout << "Database: " << m_database_type << std::endl;
+		std::cout << "Database File: " << m_database_file << std::endl;
 
 		std::cout << "Stats DB Server IP: " << strStatsDBServerIP << std::endl;
 		std::cout << "Stats DB Port: " << nStatsDBServerPort << std::endl;
@@ -83,6 +85,7 @@ namespace nexuspool
 
 		j.at("logfile").get_to(m_logfile);
 		j.at("database_type").get_to(m_database_type);
+		j.at("database_file").get_to(m_database_file);
 
 		j.at("stats_db_server_ip").get_to(strStatsDBServerIP);
 		j.at("stats_db_server_port").get_to(nStatsDBServerPort);

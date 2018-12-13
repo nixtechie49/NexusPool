@@ -1,5 +1,6 @@
 #include "daemon_connection.hpp"
 #include "pool_connection.hpp"
+#include "daemon_packet.hpp"
 #include "LLP/block.h"
 #include "LLP/ddos.hpp"
 #include "packet.hpp"
@@ -15,10 +16,6 @@ namespace nexuspool
 		, m_logger{spdlog::get("logger")}
 	{
 	}
-	//void Pool_connection::connection_handler(network::Result::Code result, network::Shared_payload&& receive_buffer)
-	//{
-	//
-	//}
 
 	bool Daemon_connection::connect(network::Endpoint remote_wallet)
 	{
@@ -51,6 +48,12 @@ namespace nexuspool
 
 		m_connection = std::move(connection);
 		return true;
+	}
+
+	void Daemon_connection::add_pool_connection(std::weak_ptr<Pool_connection> connection)
+	{
+		std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
+		m_pool_connections.push_back(std::move(connection));
 	}
 
 	void Daemon_connection::process_data(network::Shared_payload&& receive_buffer)

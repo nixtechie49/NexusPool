@@ -69,7 +69,7 @@ namespace LLD
 			for(typename std::map<KeyType, RecordType>::iterator nIterator = mapRecords.begin(); nIterator != mapRecords.end(); nIterator++)
 			{
 				std::vector<unsigned char> vData = nIterator->second.Serialize();
-				std::vector<unsigned char> vSize = nexuspool::uint2bytes(vData.size());
+				std::vector<unsigned char> vSize = nexuspool::uint2bytes(static_cast<uint32_t>(vData.size()));
 				fOutgoing.write((char*) &vSize[0], 4);
 				fOutgoing.write((char*) &vData[0], vData.size());
 			}
@@ -96,7 +96,7 @@ namespace LLD
 			
 			/** Get the Size of the Database File. **/
 			fIncoming.seekg (0, fIncoming.end);
-			unsigned int nLength = fIncoming.tellg();
+			auto nLength = fIncoming.tellg();
 			fIncoming.seekg (0, fIncoming.beg);
 			
 			

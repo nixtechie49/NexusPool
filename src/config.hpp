@@ -22,6 +22,9 @@ public:
 	std::string const& get_logfile() const { return m_logfile; }
 	std::string const& get_database_type() const { return m_database_type; }
 	std::string const& get_database_file() const { return m_database_file; }
+	
+	uint32_t get_maintenance_timer_seconds() const { return m_maintenance_timer_seconds; }	
+	uint32_t get_persistance_timer_seconds() const { return m_persistance_timer_seconds; }
 
 private:
 
@@ -36,6 +39,10 @@ private:
 	std::string  m_logfile;
 	std::string  m_database_type;
 	std::string  m_database_file;
+	
+	uint32_t	 m_maintenance_timer_seconds;
+	uint32_t	 m_persistance_timer_seconds;
+	
 
 	std::string  strStatsDBServerIP;
 	int          nStatsDBServerPort;

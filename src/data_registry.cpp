@@ -4,7 +4,7 @@
 
 namespace nexuspool
 {
-	Data_registry::Data_registry(Config& config, chrono::Timer_factory::Sptr&& timer_factory)
+	Data_registry::Data_registry(Config& config, chrono::Timer_factory::Sptr timer_factory)
 		: m_database{}
 		, m_stats_collector{std::make_unique<Stats_collector>()}
 		, m_block_db{std::make_shared<Block_db>("blk.dat")}
@@ -18,6 +18,11 @@ namespace nexuspool
 
 	}
 
+	Data_registry::~Data_registry()
+	{
+		m_banned_users->save_banned_users();
+	}
+
 	void Data_registry::init()
 	{
 		if (m_config.get_database_type() == "sqlite")
@@ -25,7 +30,14 @@ namespace nexuspool
 			m_database = std::make_unique<database::Sqlite_database>(m_config.get_database_file());
 		}
 
-		m_persistance_timer->start(chrono::Seconds(10), [self = shared_from_this()](bool canceled) 
+		m_banned_users = std::make_unique< Banned_users_file>("account.ban", "ip.ban");
+		m_banned_users->load_banned_users();
+		m_persistance_timer->start(chrono::Seconds(m_config.get_persistance_timer_seconds()), persistance_handler());		
+	}
+	
+	chrono::Timer::Handler Data_registry::persistance_handler()
+	{
+		return [self = shared_from_this()](bool canceled) 
 		{
 			if (canceled)
 			{
@@ -36,7 +48,10 @@ namespace nexuspool
 			self->m_account_db->WriteToDisk();
 
 			// write statistics to db
-
-		});
+			
+			// start timer again
+			self->m_persistance_timer->start(chrono::Seconds(self->m_config.get_persistance_timer_seconds()), 
+											self->persistance_handler());
+		};
 	}
 }

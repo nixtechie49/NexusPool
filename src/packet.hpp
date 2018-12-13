@@ -41,7 +41,10 @@ namespace nexuspool
 			CLOSE = 254
 		};
 
-        Packet() : m_header{255}, m_length{0} {}
+        Packet() : m_header{255}, m_length{0} 
+		{
+		}
+		// creates a packet from received buffer
 		explicit Packet(network::Shared_payload buffer)
 		{
 			uint8_t m_header = (*buffer)[0];

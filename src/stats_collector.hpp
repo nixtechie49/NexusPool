@@ -34,6 +34,7 @@ namespace nexuspool
 	{
 	public:
 
+		Stats_collector() = default;
 		Stats_collector(chrono::Timer::Uptr&& persistance_timer);
 		~Stats_collector();
 		void init();

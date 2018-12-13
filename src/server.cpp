@@ -33,8 +33,7 @@ bool Server::init()
 	if (!m_config.read_config())
 	{
 		return false;
-	}
-		
+	}		
 
 	auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 	if (!m_config.get_logfile().empty())
@@ -50,7 +49,7 @@ bool Server::init()
 
 	// global data registry
 	chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);
-	m_data_registry = std::make_shared<Data_registry>(m_config, std::move(timer_factory));
+	m_data_registry = std::make_shared<Data_registry>(m_config, timer_factory);
 	m_data_registry->init();
 
 	// network initialisation
@@ -62,6 +61,9 @@ bool Server::init()
 
 	network::Endpoint local_ep{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
 	m_daemon_connection = std::make_shared<Daemon_connection>(std::move(socket_factory->create_socket(local_ep)));
+	
+	// timer
+	m_maintenance_timer = timer_factory->create_timer();
 
 	return true;
 }
@@ -83,15 +85,41 @@ void Server::run()
 		logger->critical("Couldn't connect to wallet using ip {}", m_config.get_wallet_ip());
 		return;
 	}
-
+	
+	// start the maintenance timer (for cleaning up purposes)
+	m_maintenance_timer->start(chrono::Seconds(m_config.get_maintenance_timer_seconds()), maintenance_timer_handler());	
+	
 	// on listen/accept, save created connection to pool_conenctions and call the connection_handler of created pool connection object
 	network::Socket::Connect_handler socket_handler = [this](network::Connection::Sptr&& connection)
 	{
-		m_pool_connections.push_back(std::make_shared<Pool_connection>(std::move(connection), m_data_registry));
-		return m_pool_connections.back()->init_connection_handler();
+		auto pool_connection = std::make_shared<Pool_connection>(std::move(connection), m_daemon_connection, m_data_registry);
+		
+		std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
+		m_pool_connections.push_back(pool_connection);
+		return pool_connection->init_connection_handler();
 	};
 
 	m_listen_socket->listen(socket_handler);
+}
+
+chrono::Timer::Handler Server::maintenance_timer_handler()
+{
+	return [this](bool canceled) 
+	{
+		if(canceled)	// don't do anything if the timer has been canceled
+		{
+			return;
+		}
+		
+		// clean disconnected pool_connections
+		std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
+		
+		m_pool_connections.erase(std::remove_if(m_pool_connections.begin(), m_pool_connections.end(),
+        [](auto connection) { return connection->closed(); }), m_pool_connections.end());
+		
+		// start the timer again
+		m_maintenance_timer->start(chrono::Seconds(m_config.get_maintenance_timer_seconds()), maintenance_timer_handler());
+	};		
 }
 
 }

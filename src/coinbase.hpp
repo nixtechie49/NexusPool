@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <mutex>
 #include <utility>
 
 #include "utils.hpp"
@@ -13,10 +14,6 @@ namespace nexuspool
 	/** Class to Create and Manage the Pool Payout Coinbase Tx. **/
 	class Coinbase
 	{
-		/** The Value of the Coinbase Transaction thus Far. **/
-		uint64_t nCurrentValue;
-
-
 		/** Add Output to the Transaction. **/
 		void AddOutput(std::string nAddress, uint64_t nValue)
 		{
@@ -32,6 +29,8 @@ namespace nexuspool
 		/** The Transaction Outputs to be Serialized to Mining LLP. **/
 		std::map<std::string, uint64_t> mapOutputs;
 
+		/** The Value of the Coinbase Transaction thus Far. **/
+		uint64_t nCurrentValue;
 
 		/** The Value of this current Coinbase Payout. **/
 		uint64_t nMaxValue, nPoolFee;
@@ -231,6 +230,64 @@ namespace nexuspool
 
 			printf("\n\n +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\n");
 		}
+	};
+
+	// Threadsafe wrapper for Coinbase
+	class Coinbase_mt
+	{
+	public:
+
+		explicit Coinbase_mt(Coinbase& coinbase) : m_coinbase{ coinbase } {}
+
+		/** Reset the Coinbase Transaction for a new Round. **/
+		void reset(uint64_t nMax)
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			m_coinbase.Reset(nMax);
+		}
+
+		/** Return the Remainding NIRO to complete the Transaction. **/
+		uint64_t get_remainder() 
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			return m_coinbase.GetRemainder();
+		};
+
+		uint64_t add_transaction(std::string nAddress, uint64_t nValue)
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			return m_coinbase.AddTransaction(std::move(nAddress), nValue);
+		}
+
+		std::vector<uint8_t> serialize()
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			return m_coinbase.Serialize();
+		}
+
+		bool find_address(std::string const& nxs_address)
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			return (m_coinbase.mapOutputs.find(nxs_address) != m_coinbase.mapOutputs.end());
+		}
+
+		uint64_t get_map_outputs(std::string const& nxs_address)
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			return m_coinbase.mapOutputs[nxs_address];
+		}
+
+		bool is_complete() 
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			return m_coinbase.IsComplete();
+		}
+
+	private:
+
+		Coinbase& m_coinbase;
+		std::mutex m_map_outputs_mutex;
+
 	};
 
 }

@@ -5,6 +5,7 @@
 #include "chrono/timer_factory.hpp"
 #include "chrono/timer.hpp"
 #include "stats_collector.hpp"
+#include "coinbase.hpp"
 #include "LLD/database.h"
 #include "LLD/record.h"
 #include "LLP/block.h"
@@ -48,6 +49,9 @@ namespace nexuspool
 		
 		void set_submit_block(LLP::CBlock const& block) { m_submit_block = block; }
 		LLP::CBlock const& get_submit_block() const { return m_submit_block; }
+
+		// only access to threadsafe coinbase
+		Coinbase_mt const& get_coinbase() const { return m_coinbase_mt; }
 		
 		
 		// global data
@@ -64,6 +68,8 @@ namespace nexuspool
 		chrono::Timer::Uptr m_persistance_timer;
 		uint32_t m_min_share;	// not protected -> will be set one time at startup and then only read by multiple connections
 		bool m_use_ddos;		// not protected -> will be set one time at startup and then only read by multiple connections
+		Coinbase m_coinbase;
+		Coinbase_mt m_coinbase_mt;
 		LLP::CBlock m_submit_block;
 	};
 

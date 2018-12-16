@@ -28,7 +28,7 @@ namespace nexuspool
 
 		Daemon_connection(network::Socket::Sptr&& socket);
 		bool connect(network::Endpoint remote_wallet);
-		void add_pool_connection(std::weak_ptr<Pool_connection> connection);
+		void add_pool_connection(std::weak_ptr<Pool_connection> connection);	// called from pool_connections (different threads)
 
 	private:
 

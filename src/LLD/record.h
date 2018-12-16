@@ -2,7 +2,7 @@
 #define COINSHIELD_LLD_ACCOUNT
 
 #include "database.h"
-#include "../coinbase.h"
+#include "../coinbase.hpp"
 #include "../hash/uint1024.h"
 #include "../utils.hpp"
 

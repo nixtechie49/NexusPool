@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <memory>
 #include "network/types.hpp"
 
 namespace nexuspool
@@ -71,6 +72,33 @@ namespace nexuspool
 			return ((m_header < 128 && m_length > 0) || (m_header >= 128 && m_header < 255 && m_length == 0));
 		}
 
+		network::Shared_payload get_bytes()
+		{
+			std::vector<uint8_t> BYTES(1, m_header);
+
+			/** Handle for Data Packets. **/
+			if (m_header < 128)
+			{
+				BYTES.push_back((m_length >> 24)); 
+				BYTES.push_back((m_length >> 16));
+				BYTES.push_back((m_length >> 8));  
+				BYTES.push_back(m_length);
+
+				BYTES.insert(BYTES.end(), m_data->begin(), m_data->end());
+			}
+
+			return std::make_shared<std::vector<uint8_t>>(BYTES);
+		}
+
+		inline network::Shared_payload create_respond(uint8_t header) { get_packet(header).get_bytes(); }
+
+		inline Packet get_packet(uint8_t header) const
+		{
+			Packet packet;
+			packet.m_header = header;
+
+			return packet;
+		}
 
     };
 

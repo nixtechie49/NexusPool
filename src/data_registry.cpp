@@ -14,6 +14,8 @@ namespace nexuspool
 		, m_persistance_timer{m_timer_factory->create_timer()}
 		, m_min_share{m_config.get_min_share()}
 		, m_use_ddos{ m_config.get_use_ddos()}
+		, m_coinbase{}
+		, m_coinbase_mt{m_coinbase}
 	{
 
 	}

@@ -3,12 +3,16 @@
 
 #include "network/connection.hpp"
 #include "LLP/ddos.hpp"
+#include "LLP/block.h"
+#include "hash/templates.h"
 #include "stats_collector.hpp"
 #include <spdlog/spdlog.h>
 
 #include <string>
 #include <memory>
 #include <atomic>
+#include <set>
+#include <map>
 
 namespace LLP 
 { 
@@ -36,6 +40,8 @@ namespace nexuspool
 		// indicate if the network connection has been closed or not
 		bool closed() const { return m_connection_closed; }
 
+		void new_round();
+
 
 	private:
 
@@ -50,6 +56,9 @@ namespace nexuspool
 		std::weak_ptr<Data_registry> m_data_registry;	// global data access
 		std::shared_ptr<spdlog::logger> m_logger;
 		std::unique_ptr<LLP::DDOS_Filter> m_ddos;
+		std::mutex m_primes_mutex;		// must be protected because daemon_connection can clear the set
+		std::set<uint1024> m_primes;	// stores the found shares per round
+		std::map<uint1024, LLP::CBlock> m_blocks_requested;	// map of requested blocks per round
 		std::string m_nxsaddress;
 		bool m_logged_in;
 		bool m_isDDOS;	// use ddos or not

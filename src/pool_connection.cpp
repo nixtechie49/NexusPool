@@ -4,6 +4,7 @@
 #include "LLP/block.h"
 #include "LLP/ddos.hpp"
 #include "packet.hpp"
+#include "prime.hpp"
 #include "base58.h"
 #include "utils.hpp"
 
@@ -181,172 +182,207 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		return;
 	}
 
-	///** New block Process:
-	//	Keeps a map of requested blocks for this connection.
-	//	Clears map once new block is submitted successfully. **/
-	//if (packet.m_header == Packet::GET_BLOCK)
-	//{
-	//	LOCK(BLOCK_MUTEX);
-	//	nBlockRequests++;
+	/** New block Process:
+		Keeps a map of requested blocks for this connection.
+		Clears map once new block is submitted successfully. **/
+	if (packet.m_header == Packet::GET_BLOCK)
+	{
+		// daemon get_block
+		LOCK(BLOCK_MUTEX);
+		nBlockRequests++;
 
-	//	if (m_ddos)
-	//		m_ddos->rSCORE += 1;
-	//}
-	///** Send the Current Account balance to Pool Miner. **/
-	//else if(packet.m_header == Packet::GET_BALANCE)
-	//{
-	//	Packet RESPONSE = GetPacket(ACCOUNT_BALANCE);
-	//	RESPONSE.LENGTH = 8;
-	//	RESPONSE.DATA = uint2bytes64(Core::AccountDB.GetRecord(ADDRESS).nAccountBalance);
-	//		
-	//	m_logger->debug("Pool: Account {} --> Balance Requested", ADDRESS);
-	//	this->WritePacket(RESPONSE);
-	//}		
-	///** Send the Current Account balance to Pool Miner. **/
-	//else if(packet.m_header == Packet::GET_PAYOUT)
-	//{
-	//	Packet RESPONSE = GetPacket(PENDING_PAYOUT);
-	//	RESPONSE.LENGTH = 8;
-	//	
-	//	uint64 nPendingPayout = 0;
-	//	if(Core::cGlobalCoinbase.mapOutputs.count(ADDRESS))
-	//	{
-	//		nPendingPayout = Core::cGlobalCoinbase.mapOutputs[ADDRESS];
-	//	}
-	//		
-	//		
-	//	RESPONSE.DATA = uint2bytes64(nPendingPayout);
-	//		
-	//	m_logger->debug("Pool: Account {} --> Payout Data Requested", ADDRESS);
-	//	this->WritePacket(RESPONSE);
-	//}
-	//		
-	///** Handle a Ping from the Pool Miner. **/
-	//else if(packet.m_header == Packet::PING)
-	//{
-	//	this->WritePacket(GetPacket(PING));
-	//}
-	//else if(packet.m_header == Packet::SUBMIT_PPS)
-	//{ 
-	//	// grab the current PPS from the miner
-	//	double PPS = bytes2double(std::vector<uint8_t>(packet.m_data->begin(), packet.m_data->end() - 8));	
-	//	double WPS = bytes2double(std::vector<uint8_t>(packet.m_data->begin() +8, packet.m_data->end()));	
-	//	
-	//	Core::STATSCOLLECTOR.UpdateConnectionData( ADDRESS, GUID, PPS, WPS);
+		if (m_ddos)
+			m_ddos->rSCORE += 1;
+	}
+	/** Send the Current Account balance to Pool Miner. **/
+	else if(packet.m_header == Packet::GET_BALANCE)
+	{
+		Packet response; 
+		response = response.get_packet(Packet::ACCOUNT_BALANCE);
+		response.m_length = 8;
+		response.m_data = std::make_shared<std::vector<uint8_t>>(uint2bytes64(data_registry->m_account_db->GetRecord(m_nxsaddress).nAccountBalance));
+			
+		m_logger->debug("Pool: Account {} --> Balance Requested", m_nxsaddress);
+		m_connection->transmit(response.get_bytes());
+	}		
+	/** Send the Current Account balance to Pool Miner. **/
+	else if(packet.m_header == Packet::GET_PAYOUT)
+	{
+		Packet response;
+		response = response.get_packet(Packet::PENDING_PAYOUT);
+		response.m_length = 8;
+		
+		uint64_t pending_payout = 0;
+		auto coinbase_global = data_registry->get_coinbase();
+		if(coinbase_global.find_address(m_nxsaddress))
+		{
+			pending_payout = coinbase_global.get_map_outputs(m_nxsaddress);
+		}
+			
+		response.m_data = std::make_shared<std::vector<uint8_t>>(uint2bytes64(pending_payout));
+			
+		m_logger->debug("Pool: Account {} --> Payout Data Requested", m_nxsaddress);
+		m_connection->transmit(response.get_bytes());
+	}
+			
+	/** Handle a Ping from the Pool Miner. **/
+	else if(packet.m_header == Packet::PING)
+	{
+		Packet response;
+		response = response.get_packet(Packet::PING);
+		m_connection->transmit(response.get_bytes());
+	}
+	else if(packet.m_header == Packet::SUBMIT_PPS)
+	{ 
+		// grab the current PPS from the miner
+		double PPS = bytes2double(std::vector<uint8_t>(packet.m_data->begin(), packet.m_data->end() - 8));	
+		double WPS = bytes2double(std::vector<uint8_t>(packet.m_data->begin() +8, packet.m_data->end()));	
+		
+		Core::STATSCOLLECTOR.UpdateConnectionData(m_nxsaddress, GUID, PPS, WPS);
 
-	//	this->WritePacket(GetPacket(PING));
-	//}
-	///** Submit Share Process:
-	//	Accepts a new block Merkle and nNonce for submit.
-	//	This is to correlate where in memory the actual
-	//	block is from MAP_BLOCKS. **/
-	//else if(packet.m_header == Packet:SUBMIT_SHARE)
-	//{
-	//	uint1024 hashPrimeOrigin;
-	//	hashPrimeOrigin.SetBytes(std::vector<uint8_tr>(packet.m_data->begin(), packet.m_data->end() - 8));			
-	//		
-	//	/** Don't Accept a Share with no Correlated Block. **/
-	//	if(!MAP_BLOCKS.count(hashPrimeOrigin))
-	//	{
-	//		Respond(REJECT);
-	//		m_logger->info("Pool: Block Not Found {}", hashPrimeOrigin.ToString().substr(0, 30));
-	//		Respond(NEW_BLOCK);
-	//		
-	//		if(fDDOS)
-	//			DDOS->rSCORE += 1;
-	//		
-	//		return;
-	//	}
-	//	
-	//	/** Reject the Share if it is not of the Most Recent Block. **/
-	//	if(MAP_BLOCKS[hashPrimeOrigin]->nHeight != Core::nBestHeight)
-	//	{
-	//		m_logger->info("Pool: Rejected Share - Share is Stale, submitted: {0} current: {1}", 
-	//		MAP_BLOCKS[hashPrimeOrigin]->nHeight, Core::nBestHeight);
-	//		
-	//		Respond(STALE);
-	//		Respond(NEW_BLOCK);
-	//		
-	//		/** Be Lenient on Stale Shares [But Still amplify score above normal 1 per request.] **/
-	//		if(fDDOS)
-	//			DDOS->rSCORE += 2;
-	//			
-	//		return;
-	//	}			
-	//		
-	//	/** Get the Prime Number Found. **/
-	//	uint64 nNonce = bytes2uint64(std::vector<unsigned char>(PACKET.DATA.end() - 8, PACKET.DATA.end()));
-	//	uint1024 hashPrime = hashPrimeOrigin + nNonce;	
-	//
-	//	/** Check the Share that was just submitted. **/
-	//	{ LOCK(Core::PRIMES_MUTEX);
-	//		if(Core::PRIMES_MAP.count(hashPrime))
-	//		{
-	//			m_logger->info("Pool: Duplicate Share {}", hashPrime.ToString().substr(0, 30));
-	//			Respond(REJECT);
-	//			
-	//			/** Give a Heavy Score for Duplicates. [To Amplify the already existing ++ per Request.] **/
-	//			if(fDDOS)
-	//				DDOS->rSCORE += 5;
-	//			
-	//			return;
-	//		}
-	//	}		
-	//	
-	//	/** Check the Difficulty of the Share. **/
-	//	double nDifficulty = Core::GmpVerification(CBigNum(hashPrime));
-	//	
-	//	if(Core::SetBits(nDifficulty) >= Core::nMinimumShare)
-	//	{
-	//		{ LOCK(Core::PRIMES_MUTEX);
-	//			if(!Core::PRIMES_MAP.count(hashPrime))
-	//			{
-	//				Core::PRIMES_MAP[hashPrime] = nDifficulty;
-	//			}					
-	//		}
-	//		
-	//		if(nDifficulty < 8)
-	//		{
-	//			Core::nDifficultyShares[(unsigned int) floor(nDifficulty - 3)]++;
-	//		}
-	//		
-	//		LLD::Account cAccount = Core::AccountDB.GetRecord(ADDRESS);
-	//		uint64 nWeight = pow(25.0, nDifficulty - 3.0);
-	//		cAccount.nRoundShares += nWeight;
-	//		Core::AccountDB.UpdateRecord(cAccount);
-	//		
-	//		m_logger->debug("Pool: Share Accepted of Difficulty {0} | Weight {1}", nDifficulty, nWeight);
-	//		
-	//		/** If the share is above the difficulty, give block finder bonus and add to Submit Stack. **/
-	//		if(nDifficulty >= Core::GetDifficulty(MAP_BLOCKS[hashPrimeOrigin]->nBits))
-	//		{
-	//			MAP_BLOCKS[hashPrimeOrigin]->nNonce = nNonce;
-	//			
-	//			{ LOCK(SUBMISSION_MUTEX);
-	//				if(!SUBMISSION_BLOCK)
-	//				{
-	//					SUBMISSION_BLOCK = MAP_BLOCKS[hashPrimeOrigin];
-	//					
-	//					Respond(BLOCK);
-	//				}
-	//			}
-	//		}
-	//		else
-	//		{
-	//			Respond(ACCEPT);
-	//		}				
-	//	}
-	//	else
-	//	{
-	//		m_logger->info("Pool: Share Below Difficulty {}", nDifficulty);
-	//		
-	//		/** Give Heavy Score for Below Difficulty Shares. Would require at least 4 per Second to fulfill a score of 20. **/
-	//		if(fDDOS)
-	//			DDOS->rSCORE += 5;
-	//		
-	//		Respond(REJECT);
-	//	}
-	//}
+		Packet response;
+		response = response.get_packet(Packet::PING);
+		m_connection->transmit(response.get_bytes());
+	}
+	/** Submit Share Process:
+		Accepts a new block Merkle and nNonce for submit.
+		This is to correlate where in memory the actual
+		block is from MAP_BLOCKS. **/
+	else if(packet.m_header == Packet::SUBMIT_SHARE)
+	{
+		uint1024 hashPrimeOrigin;
+		hashPrimeOrigin.SetBytes(std::vector<uint8_t>(packet.m_data->begin(), packet.m_data->end() - 8));			
+			
+		/** Don't Accept a Share with no Correlated Block. **/
+		if(!m_blocks_requested.count(hashPrimeOrigin))
+		{
+			Packet response;
+			response = response.get_packet(Packet::REJECT);
+			m_connection->transmit(response.get_bytes());
+
+			m_logger->info("Pool: Block Not Found {}", hashPrimeOrigin.ToString().substr(0, 30));
+
+			Packet response_block;
+			response_block = response_block.get_packet(Packet::NEW_BLOCK);
+			m_connection->transmit(response_block.get_bytes());
+			
+			if(m_isDDOS)
+				m_ddos->rSCORE += 1;
+			
+			return;
+		}
+		
+		/** Reject the Share if it is not of the Most Recent Block. **/
+		if(m_blocks_requested[hashPrimeOrigin].nHeight != data_registry->m_best_height)
+		{
+			m_logger->info("Pool: Rejected Share - Share is Stale, submitted: {0} current: {1}", 
+				m_blocks_requested[hashPrimeOrigin].nHeight, data_registry->m_best_height);
+			
+			Packet response;
+			response = response.get_packet(Packet::STALE);
+			m_connection->transmit(response.get_bytes());
+
+			Packet response_block;
+			response_block = response_block.get_packet(Packet::NEW_BLOCK);
+			m_connection->transmit(response_block.get_bytes());
+			
+			/** Be Lenient on Stale Shares [But Still amplify score above normal 1 per request.] **/
+			if(m_isDDOS)
+				m_ddos->rSCORE += 2;
+				
+			return;
+		}			
+			
+		/** Get the Prime Number Found. **/
+		uint64_t nNonce = bytes2uint64(std::vector<uint8_t>(packet.m_data->end() - 8, packet.m_data->end()));
+		uint1024 hashPrime = hashPrimeOrigin + nNonce;	
+
+		size_t primes_count = 0;
+		{
+			std::lock_guard<std::mutex> lk(m_primes_mutex);
+			primes_count = m_primes.count(hashPrime);
+		}
+	
+		/** Check the Share that was just submitted. **/
+		if(primes_count != 0)
+		{
+			m_logger->info("Pool: Duplicate Share {}", hashPrime.ToString().substr(0, 30));
+			Packet response;
+			response = response.get_packet(Packet::REJECT);
+			m_connection->transmit(response.get_bytes());
+				
+			/** Give a Heavy Score for Duplicates. [To Amplify the already existing ++ per Request.] **/
+			if(m_isDDOS)
+				m_ddos->rSCORE += 5;
+				
+			return;
+		}	
+		
+		/** Check the Difficulty of the Share. **/
+		double nDifficulty = gmp_verification(hashPrime);
+		
+		if(set_bits(nDifficulty) >= data_registry->get_min_share())
+		{
+			{
+				std::lock_guard<std::mutex> lk(m_primes_mutex);
+				m_primes.insert(hashPrime);		// unique entry because of set		
+			}
+	
+			// statistics, found chains
+			//if(nDifficulty < 8)
+			//{
+			//	Core::nDifficultyShares[(unsigned int) floor(nDifficulty - 3)]++;
+			//}
+			
+			LLD::Account cAccount = data_registry->m_account_db->GetRecord(m_nxsaddress);
+			uint64_t weight = pow(25.0, nDifficulty - 3.0);
+			cAccount.nRoundShares += weight;
+			data_registry->m_account_db->UpdateRecord(cAccount);
+			
+			m_logger->debug("Pool: Share Accepted of Difficulty {0} | Weight {1}", nDifficulty, weight);
+			
+			/** If the share is above the difficulty, give block finder bonus and add to Submit Stack. **/
+			if(nDifficulty >= get_difficulty(m_blocks_requested[hashPrimeOrigin].nBits))
+			{
+				m_blocks_requested[hashPrimeOrigin].nNonce = nNonce;
+				
+				{ LOCK(SUBMISSION_MUTEX);
+					if(!SUBMISSION_BLOCK)
+					{
+						SUBMISSION_BLOCK = m_blocks_requested[hashPrimeOrigin];
+						
+						Packet response;
+						response = response.get_packet(Packet::BLOCK);
+						m_connection->transmit(response.get_bytes());
+					}
+				}
+			}
+			else
+			{
+				Packet response;
+				response = response.get_packet(Packet::ACCEPT);
+				m_connection->transmit(response.get_bytes());
+			}				
+		}
+		else
+		{
+			m_logger->info("Pool: Share Below Difficulty {}", nDifficulty);
+			
+			/** Give Heavy Score for Below Difficulty Shares. Would require at least 4 per Second to fulfill a score of 20. **/
+			if(m_isDDOS)
+				m_ddos->rSCORE += 5;
+			
+			Packet response;
+			response = response.get_packet(Packet::REJECT);
+			m_connection->transmit(response.get_bytes());
+		}
+	}
+}
+
+void Pool_connection::new_round()
+{
+	m_primes.clear();
+	m_blocks_requested.clear();
 }
 
 void Pool_connection::ddos_invalid_header(Packet const& packet)

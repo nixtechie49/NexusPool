@@ -5,6 +5,7 @@
 #include "LLP/ddos.hpp"
 #include "LLP/block.h"
 #include "hash/templates.h"
+#include "hash/uint1024.h"
 #include "stats_collector.hpp"
 #include <spdlog/spdlog.h>
 
@@ -40,6 +41,9 @@ namespace nexuspool
 		// indicate if the network connection has been closed or not
 		bool closed() const { return m_connection_closed; }
 
+		// threadsafe because it wil only be written at connection init (before daemon gets it)
+		std::string const& get_remote_address() const { return m_remote_address; }	
+
 		void new_round();
 
 
@@ -64,6 +68,7 @@ namespace nexuspool
 		bool m_isDDOS;	// use ddos or not
 		std::atomic<bool> m_connection_closed;	// indicator for server if the network connection has been closed
 		std::string m_remote_address;	// remote ip address
+		uint16_t m_num_blocks_requested;
 		Stats_connection m_stats;	// statistics per connection. Will be consumed by Stats_collector
 	};
 

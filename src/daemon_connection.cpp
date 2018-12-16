@@ -53,7 +53,43 @@ namespace nexuspool
 	void Daemon_connection::add_pool_connection(std::weak_ptr<Pool_connection> connection)
 	{
 		std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
-		m_pool_connections.push_back(std::move(connection));
+		m_pool_connections.push_back(Pool_connection_data(std::move(connection), 0));
+	}
+
+	void Daemon_connection::request_block(uint16_t blocks_requested, std::string const& ip_address)
+	{
+		std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
+
+		// get rid of expired connections
+		for(auto iter = m_pool_connections.begin(); iter != m_pool_connections.end(); ++iter)
+		{
+			if (iter->first.expired())
+			{ 
+				iter = m_pool_connections.erase(iter); 
+				continue; 
+			}
+		}
+
+		auto find_iter = std::find_if(m_pool_connections.begin(), m_pool_connections.end(),
+			[&ip_address](const Pool_connection_data& pool_connection_data) 
+		{ 
+			auto pool_connection = pool_connection_data.first.lock();
+			if (!pool_connection)
+			{
+				return false;
+			}
+			
+			return pool_connection->get_remote_address() == ip_address;
+		});
+
+		if (find_iter == m_pool_connections.end())
+		{
+			// this shouldn't happen
+			m_logger->error("Daemon: request_block didn't find ip: {} in stored pool connections.", ip_address);
+		}
+
+		// finally store the new block requested number for this pool connection
+		find_iter->second = blocks_requested;
 	}
 
 	void Daemon_connection::process_data(network::Shared_payload&& receive_buffer)
@@ -188,19 +224,27 @@ namespace nexuspool
 		//	}
 		//	}
 
-		//	/** Get Blocks if Requested From Pool Connection. **/
-		//	{ LOCK(CONNECTIONS[nIndex]->BLOCK_MUTEX);
-		//	while (CONNECTIONS[nIndex]->nBlockRequests > 0)
-		//	{
-		//		CONNECTIONS[nIndex]->nBlockRequests--;
-		//		CONNECTIONS[nIndex]->nBlocksWaiting++;
+			/** Get Blocks if Requested From Pool Connection. **/
+			//{
+			//std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
 
-		//		CLIENT->GetBlock();
-		//		//CLIENT->GetBlock();
+			//// get rid of expired connections
+			//for (auto iter = m_pool_connections.begin(); iter != m_pool_connections.end(); ++iter)
+			//{
 
-		//		//printf("[DAEMON] Requesting Block from Daemon Handle %u\n", ID);
-		//	}
-		//	}
+			//}
+
+			//while (CONNECTIONS[nIndex]->nBlockRequests > 0)
+			//{
+			//	CONNECTIONS[nIndex]->nBlockRequests--;
+			//	CONNECTIONS[nIndex]->nBlocksWaiting++;
+
+			//	CLIENT->GetBlock();
+			//	//CLIENT->GetBlock();
+
+			//	//printf("[DAEMON] Requesting Block from Daemon Handle %u\n", ID);
+			//}
+			//}
 		//}
 		//}
 	}

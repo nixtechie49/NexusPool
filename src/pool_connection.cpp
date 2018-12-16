@@ -23,6 +23,7 @@ Pool_connection::Pool_connection(network::Connection::Sptr&& connection,
 	, m_isDDOS{true}
 	, m_connection_closed{false}
 	, m_remote_address{""}
+	, m_num_blocks_requested{0}
 {
 	auto registry = m_data_registry.lock();
 	if (registry)
@@ -55,12 +56,12 @@ network::Connection::Handler Pool_connection::init_connection_handler()
 			if(!daemon_connection)
 			{
 				// no daemon available? Can't do anything -> close connection
-					self->m_connection = nullptr;		// close connection (socket etc)
-					self->m_connection_closed = true;
+				self->m_connection = nullptr;		// close connection (socket etc)
+				self->m_connection_closed = true;
 			}
 			else
 			{
-				daemon_connection->add_pool_connection(self);				
+				daemon_connection->add_pool_connection(self);
 			}
 			
 		}
@@ -188,8 +189,16 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 	if (packet.m_header == Packet::GET_BLOCK)
 	{
 		// daemon get_block
-		LOCK(BLOCK_MUTEX);
-		nBlockRequests++;
+		auto daemon_connection = m_daemon_connection.lock();
+		if(!daemon_connection)
+		{
+			// no daemon available? Can't do anything -> close connection
+			m_connection = nullptr;		// close connection (socket etc)
+			m_connection_closed = true;
+			return;
+		}
+
+		daemon_connection->request_block(++m_num_blocks_requested, m_remote_address);
 
 		if (m_ddos)
 			m_ddos->rSCORE += 1;

@@ -97,10 +97,9 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 	if (!data_registry)
 	{
 		// can't do anything useful wwithout data registry
-		m_logger->info("Couldn't obtain a ptr to Data_registry");
+		m_logger->error("Couldn't obtain a ptr to Data_registry");
 		return;
-	}
-	
+	}	
 
 	if (packet.m_header == Packet::LOGIN)
 	{
@@ -182,22 +181,21 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 
 		return;
 	}
+	
+	auto daemon_connection = m_daemon_connection.lock();
+	if(!daemon_connection)
+	{
+		// no daemon available? Can't do anything -> close connection
+		m_connection = nullptr;		// close connection (socket etc)
+		m_connection_closed = true;
+		return;
+	}
 
 	/** New block Process:
 		Keeps a map of requested blocks for this connection.
 		Clears map once new block is submitted successfully. **/
 	if (packet.m_header == Packet::GET_BLOCK)
 	{
-		// daemon get_block
-		auto daemon_connection = m_daemon_connection.lock();
-		if(!daemon_connection)
-		{
-			// no daemon available? Can't do anything -> close connection
-			m_connection = nullptr;		// close connection (socket etc)
-			m_connection_closed = true;
-			return;
-		}
-
 		daemon_connection->request_block(++m_num_blocks_requested, m_remote_address);
 
 		if (m_ddos)
@@ -222,7 +220,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		response.m_length = 8;
 		
 		uint64_t pending_payout = 0;
-		auto coinbase_global = data_registry->get_coinbase();
+		Coinbase_mt const& coinbase_global = data_registry->get_coinbase();
 		if(coinbase_global.find_address(m_nxsaddress))
 		{
 			pending_payout = coinbase_global.get_map_outputs(m_nxsaddress);
@@ -247,7 +245,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		double PPS = bytes2double(std::vector<uint8_t>(packet.m_data->begin(), packet.m_data->end() - 8));	
 		double WPS = bytes2double(std::vector<uint8_t>(packet.m_data->begin() +8, packet.m_data->end()));	
 		
-		Core::STATSCOLLECTOR.UpdateConnectionData(m_nxsaddress, GUID, PPS, WPS);
+	//	Core::STATSCOLLECTOR.UpdateConnectionData(m_nxsaddress, GUID, PPS, WPS);
 
 		Packet response;
 		response = response.get_packet(Packet::PING);
@@ -354,16 +352,11 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			if(nDifficulty >= get_difficulty(m_blocks_requested[hashPrimeOrigin].nBits))
 			{
 				m_blocks_requested[hashPrimeOrigin].nNonce = nNonce;
-				
-				{ LOCK(SUBMISSION_MUTEX);
-					if(!SUBMISSION_BLOCK)
-					{
-						SUBMISSION_BLOCK = m_blocks_requested[hashPrimeOrigin];
-						
-						Packet response;
-						response = response.get_packet(Packet::BLOCK);
-						m_connection->transmit(response.get_bytes());
-					}
+				if(daemon_connection->submit_block(m_blocks_requested[hashPrimeOrigin], m_remote_address))
+				{					
+					Packet response;
+					response = response.get_packet(Packet::BLOCK);
+					m_connection->transmit(response.get_bytes());
 				}
 			}
 			else

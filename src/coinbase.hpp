@@ -53,15 +53,15 @@ namespace nexuspool
 		}
 
 		/** Return the Remainding NIRO to complete the Transaction. **/
-		uint64_t GetRemainder() { return nMaxValue - nCurrentValue; };
+		uint64_t GetRemainder() const { return nMaxValue - nCurrentValue; };
 
 
 		/** Flag to Know if the Coinbase Tx has been built Successfully. **/
-		bool IsComplete() { return nCurrentValue == nMaxValue; }
+		bool IsComplete() const { return nCurrentValue == nMaxValue; }
 
 
 		/** Flag to know if the Coinbase is Empty. **/
-		bool IsEmpty() { return nCurrentValue == 0; }
+		bool IsEmpty() const { return nCurrentValue == 0; }
 
 
 		/** Convert this Coinbase Transaction into a Byte Stream. **/
@@ -172,21 +172,21 @@ namespace nexuspool
 
 
 		/** Convert this Coinbase Transaction into a Byte Stream. **/
-		std::vector<unsigned char> Serialize()
+		std::vector<uint8_t> Serialize() const
 		{
 			std::vector<unsigned char> vData;
 
 			/** First byte of Serialization Packet is the Number of Records. **/
-			vData.push_back((unsigned char)mapCredits.size());
+			vData.push_back((uint8_t)mapCredits.size());
 
-			for (std::map<std::string, uint64_t>::iterator nIterator = mapCredits.begin(); nIterator != mapCredits.end(); nIterator++)
+			for(std::map<std::string, uint64_t>::const_iterator nIterator = mapCredits.begin(); nIterator != mapCredits.end(); ++nIterator)
 			{
 				/** Serialize the Address String and uint64 nValue. **/
-				std::vector<unsigned char> vAddress = string2bytes(nIterator->first);
-				std::vector<unsigned char> vValue = uint2bytes64(nIterator->second);
+				std::vector<uint8_t> vAddress = string2bytes(nIterator->first);
+				std::vector<uint8_t> vValue = uint2bytes64(nIterator->second);
 
 				/** Give a 1 Byte Data Length for Each Address in case they differ. **/
-				vData.push_back((unsigned char)vAddress.size());
+				vData.push_back((uint8_t)vAddress.size());
 
 				/** Insert the Address and Coinbase Values. **/
 				vData.insert(vData.end(), vAddress.begin(), vAddress.end());
@@ -222,10 +222,10 @@ namespace nexuspool
 
 
 		/** Output the Transactions in the Coinbase Container. **/
-		void Print()
+		void Print() const
 		{
 			printf("\n\n ++++++++++++++++++++++++++++++++ CREDITS ++++++++++++++++++++++++++++++++++++++++++ \n\n");
-			for (std::map<std::string, uint64_t>::iterator nIterator = mapCredits.begin(); nIterator != mapCredits.end(); nIterator++)
+			for (std::map<std::string, uint64_t>::const_iterator nIterator = mapCredits.begin(); nIterator != mapCredits.end(); ++nIterator)
 				printf("Credit: %s:%f\n", nIterator->first.c_str(), nIterator->second / 1000000.0);
 
 			printf("\n\n +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\n");
@@ -247,7 +247,7 @@ namespace nexuspool
 		}
 
 		/** Return the Remainding NIRO to complete the Transaction. **/
-		uint64_t get_remainder() 
+		uint64_t get_remainder() const
 		{
 			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
 			return m_coinbase.GetRemainder();
@@ -259,25 +259,25 @@ namespace nexuspool
 			return m_coinbase.AddTransaction(std::move(nAddress), nValue);
 		}
 
-		std::vector<uint8_t> serialize()
+		std::vector<uint8_t> serialize() const
 		{
 			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
 			return m_coinbase.Serialize();
 		}
 
-		bool find_address(std::string const& nxs_address)
+		bool find_address(std::string const& nxs_address) const
 		{
 			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
 			return (m_coinbase.mapOutputs.find(nxs_address) != m_coinbase.mapOutputs.end());
 		}
 
-		uint64_t get_map_outputs(std::string const& nxs_address)
+		uint64_t get_map_outputs(std::string const& nxs_address) const
 		{
 			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
 			return m_coinbase.mapOutputs[nxs_address];
 		}
 
-		bool is_complete() 
+		bool is_complete() const
 		{
 			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
 			return m_coinbase.IsComplete();
@@ -286,7 +286,7 @@ namespace nexuspool
 	private:
 
 		Coinbase& m_coinbase;
-		std::mutex m_map_outputs_mutex;
+		mutable std::mutex m_map_outputs_mutex;
 
 	};
 

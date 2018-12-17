@@ -43,6 +43,7 @@ namespace nexuspool
 
 		// threadsafe because it wil only be written at connection init (before daemon gets it)
 		std::string const& get_remote_address() const { return m_remote_address; }	
+		std::string const& get_nxs_address() const { return m_nxsaddress; }	
 
 		void new_round();
 

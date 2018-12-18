@@ -46,6 +46,7 @@ namespace nexuspool
 		std::string const& get_nxs_address() const { return m_nxsaddress; }	
 
 		void new_round();
+		void add_block(LLP::CBlock const& block);
 
 
 	private:
@@ -53,8 +54,8 @@ namespace nexuspool
 		void process_data(network::Shared_payload&& receive_buffer);
 		// checks received packet for invalid header and data. If ddos is enabled this results into a ban
 		void ddos_invalid_header(Packet const& packet);
-		// Serialize a NXS block to byte stream
-		network::Shared_payload serialize_block(LLP::CBlock* block);
+
+		bool find_hash_in_blocks_requested(uint1024 const& hash_block) const;
 
 		network::Connection::Sptr m_connection;		// network connection
 		std::weak_ptr<Daemon_connection> m_daemon_connection; 
@@ -63,13 +64,15 @@ namespace nexuspool
 		std::unique_ptr<LLP::DDOS_Filter> m_ddos;
 		std::mutex m_primes_mutex;		// must be protected because daemon_connection can clear the set
 		std::set<uint1024> m_primes;	// stores the found shares per round
+		mutable std::mutex m_blocks_requested_mutex;
 		std::map<uint1024, LLP::CBlock> m_blocks_requested;	// map of requested blocks per round
 		std::string m_nxsaddress;
 		bool m_logged_in;
 		bool m_isDDOS;	// use ddos or not
+		uint32_t m_min_share; // minimum difficulty, set by config (given from data_registry)
 		std::atomic<bool> m_connection_closed;	// indicator for server if the network connection has been closed
 		std::string m_remote_address;	// remote ip address
-		uint16_t m_num_blocks_requested;
+		std::atomic<uint16_t> m_num_blocks_requested;
 		Stats_connection m_stats;	// statistics per connection. Will be consumed by Stats_collector
 	};
 

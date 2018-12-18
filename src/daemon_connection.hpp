@@ -64,13 +64,15 @@ namespace nexuspool
 
 	private:
 
-		void process_data(network::Shared_payload&& receive_buffer);
+		void process_data(network::Shared_payload&& receive_buffer);	// handle network messages
 		LLP::CBlock deserialize_block(network::Shared_payload data);
 
 		// handler for timers
 		chrono::Timer::Handler maintenance_timer_handler();
 		chrono::Timer::Handler block_timer_handler();
 		chrono::Timer::Handler orphan_check_timer_handler();
+
+		void new_round(std::shared_ptr<Data_registry> data_registry);
 
 		void cleanup_expired_pool_connections();
 		Pool_connection_data& find_pool_connection(std::string const& ip_address);
@@ -86,6 +88,8 @@ namespace nexuspool
 		std::vector<Pool_connection_data> m_pool_connections;
 		std::mutex m_pool_connections_mutex;
 		std::atomic<bool> m_coinbase_pending;
+		bool m_new_block;
+		std::atomic<uint64_t> m_round_reward;
 		std::string m_last_blockfinder;
 		std::mutex m_last_blockfinder_mutex;
 

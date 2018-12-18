@@ -29,6 +29,7 @@ Pool_connection::Pool_connection(network::Connection::Sptr&& connection,
 	if (registry)
 	{
 		m_isDDOS = registry->get_use_ddos();
+		m_min_share = registry->get_min_share();
 	}
 
 }
@@ -261,7 +262,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		hashPrimeOrigin.SetBytes(std::vector<uint8_t>(packet.m_data->begin(), packet.m_data->end() - 8));			
 			
 		/** Don't Accept a Share with no Correlated Block. **/
-		if(!m_blocks_requested.count(hashPrimeOrigin))
+		if(!find_hash_in_blocks_requested(hashPrimeOrigin))
 		{
 			Packet response;
 			response = response.get_packet(Packet::REJECT);
@@ -278,12 +279,17 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			
 			return;
 		}
+
+		LLP::CBlock block;
+		{
+			std::lock_guard<std::mutex> lk(m_blocks_requested_mutex);
+			block = m_blocks_requested[hashPrimeOrigin];
+		}
 		
 		/** Reject the Share if it is not of the Most Recent Block. **/
-		if(m_blocks_requested[hashPrimeOrigin].nHeight != data_registry->m_best_height)
+		if(block.nHeight != data_registry->m_best_height)
 		{
-			m_logger->info("Pool: Rejected Share - Share is Stale, submitted: {0} current: {1}", 
-				m_blocks_requested[hashPrimeOrigin].nHeight, data_registry->m_best_height);
+			m_logger->info("Pool: Rejected Share - Share is Stale, submitted: {0} current: {1}", block.nHeight, data_registry->m_best_height);
 			
 			Packet response;
 			response = response.get_packet(Packet::STALE);
@@ -328,7 +334,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		/** Check the Difficulty of the Share. **/
 		double nDifficulty = gmp_verification(hashPrime);
 		
-		if(set_bits(nDifficulty) >= data_registry->get_min_share())
+		if(set_bits(nDifficulty) >= m_min_share)
 		{
 			{
 				std::lock_guard<std::mutex> lk(m_primes_mutex);
@@ -349,10 +355,10 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			m_logger->debug("Pool: Share Accepted of Difficulty {0} | Weight {1}", nDifficulty, weight);
 			
 			/** If the share is above the difficulty, give block finder bonus and add to Submit Stack. **/
-			if(nDifficulty >= get_difficulty(m_blocks_requested[hashPrimeOrigin].nBits))
+			if(nDifficulty >= get_difficulty(block.nBits))
 			{
-				m_blocks_requested[hashPrimeOrigin].nNonce = nNonce;
-				if(daemon_connection->submit_block(m_blocks_requested[hashPrimeOrigin], m_remote_address))
+				block.nNonce = nNonce;
+				if(daemon_connection->submit_block(block, m_remote_address))
 				{					
 					Packet response;
 					response = response.get_packet(Packet::BLOCK);
@@ -383,8 +389,42 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 
 void Pool_connection::new_round()
 {
-	m_primes.clear();
-	m_blocks_requested.clear();
+	{
+		std::lock_guard<std::mutex> lk(m_primes_mutex);
+		m_primes.clear();
+	}
+	{
+		std::lock_guard<std::mutex> lk(m_blocks_requested_mutex);
+		m_blocks_requested.clear();
+	}	
+
+	m_num_blocks_requested = 0;
+
+	// respone to miner -> new block
+	Packet response_block;
+	response_block = response_block.get_packet(Packet::NEW_BLOCK);
+	m_connection->transmit(response_block.get_bytes());
+}
+
+void Pool_connection::add_block(LLP::CBlock const& block)
+{
+	m_num_blocks_requested--;
+	{
+		std::lock_guard<std::mutex> lk(m_blocks_requested_mutex);
+		m_blocks_requested[block.GetHash()] = block;
+	}
+
+	Packet packet;
+	packet.m_header = Packet::BLOCK_DATA;
+	packet.m_data = packet.serialize_block(block, m_min_share);
+	packet.m_length = static_cast<uint32_t>(packet.m_data->size());
+	m_connection->transmit(packet.get_bytes());
+}
+
+bool Pool_connection::find_hash_in_blocks_requested(uint1024 const& hash_block) const
+{
+	std::lock_guard<std::mutex> lk(m_blocks_requested_mutex);
+	return (m_blocks_requested.find(hash_block) != m_blocks_requested.end());
 }
 
 void Pool_connection::ddos_invalid_header(Packet const& packet)
@@ -426,27 +466,6 @@ void Pool_connection::ddos_invalid_header(Packet const& packet)
 	}
 }
 
-/** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
-network::Shared_payload Pool_connection::serialize_block(LLP::CBlock* block)
-{
-	auto data_registry = m_data_registry.lock();
-	if (!data_registry)
-	{
-		return network::Shared_payload{};
-	}
 
-	std::vector<uint8_t> hash = block->GetHash().GetBytes();
-	std::vector<uint8_t> minimum = uint2bytes(data_registry->get_min_share());
-	std::vector<uint8_t> difficulty = uint2bytes(block->nBits);
-	std::vector<uint8_t> height = uint2bytes(block->nHeight);
-
-	std::vector<uint8_t> data;
-	data.insert(data.end(), hash.begin(), hash.end());
-	data.insert(data.end(), minimum.begin(), minimum.end());
-	data.insert(data.end(), difficulty.begin(), difficulty.end());
-	data.insert(data.end(), height.begin(), height.end());
-
-	return std::make_shared<std::vector<uint8_t>>(data);
-}
 
 }

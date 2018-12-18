@@ -2,6 +2,7 @@
 #include "pool_connection.hpp"
 #include "daemon_packet.hpp"
 #include "data_registry.hpp"
+#include "payout_manager.hpp"
 #include "LLP/block.h"
 #include "LLP/ddos.hpp"
 #include "packet.hpp"
@@ -21,6 +22,7 @@ namespace nexuspool
 		, m_logger{spdlog::get("logger")}
 		, m_timer_factory{std::move(timer_factory)}
 		, m_coinbase_pending{false}
+		, m_new_block{false}
 	{
 		m_maintenance_timer = m_timer_factory->create_timer();
 		m_block_timer = m_timer_factory->create_timer();
@@ -334,6 +336,8 @@ namespace nexuspool
 			m_logger->info("Daemon: Coinbase Transaction Set");
 			m_coinbase_pending = false;
 
+			new_round(data_registry);
+
 			/** Commit Shares to Database on New Block. **/
 			data_registry->m_account_db->WriteToDisk();
 		}
@@ -347,15 +351,14 @@ namespace nexuspool
 		/** Update the Current Round Rewards. **/
 		else if(packet.m_header == Daemon_packet::BLOCK_REWARD)
 		{
-			uint64_t round_reward = bytes2uint64(*packet.m_data);
-			m_logger->info("Daemon: Received Reward of {}", round_reward / 1000000.0);
+			m_round_reward = bytes2uint64(*packet.m_data);
+			m_logger->info("Daemon: Received Reward of {}", m_round_reward / 1000000.0);
 
 			if (data_registry->m_current_round > 1 && m_coinbase_pending)
 			{
 				Coinbase_mt& coinbase = data_registry->get_coinbase();
-				coinbase.get_pool_fee() = (round_reward * data_registry->get_config().get_pool_fee());
-				coinbase.reset(round_reward - coinbase.get_pool_fee());
-
+				coinbase.get_pool_fee() = (m_round_reward * data_registry->get_config().get_pool_fee());
+				coinbase.reset(m_round_reward - coinbase.get_pool_fee());
 
 				std::vector<std::string> vAccounts = data_registry->get_sorted_accounts();
 				for (size_t nIndex = 0; nIndex < vAccounts.size(); nIndex++)
@@ -394,8 +397,9 @@ namespace nexuspool
 			else
 			{
 				m_coinbase_pending = false;
+				new_round(data_registry);
 			}
-			m_logger->info("DAEMON: Round {0} Block {1} Rewards {2} NXS", data_registry->m_current_round, data_registry->m_best_height, round_reward / 1000000.0);
+			m_logger->info("DAEMON: Round {0} Block {1} Rewards {2} NXS", data_registry->m_current_round, data_registry->m_best_height, m_round_reward / 1000000.0);
 		}
 
 		// OPRHAN check
@@ -422,7 +426,7 @@ namespace nexuspool
 		else if (packet.m_header == Daemon_packet::GOOD)
 		{
 			m_logger->info("Daemon: Block {} accepted.", m_hash_submit_block.ToString().substr(0, 20));
-			Core::NewRound();
+			new_round(data_registry);
 
 		//	Core::fSubmittingBlock = false;
 		}
@@ -464,8 +468,8 @@ namespace nexuspool
 							pool_data.m_blocks_waiting--;
 							m_logger->info("Daemon: Block Received Height = {0} Assigned to connection {1}", 
 											block.nHeight, pool_connection->get_remote_address());
-											
-								//				CONNECTIONS[nIndex]->AddBlock(BLOCK);
+
+							pool_connection->add_block(block);
 							return;
 						}
 					}
@@ -476,34 +480,45 @@ namespace nexuspool
 				m_logger->info("Daemon: Block Obsolete Height = {}, Skipping over.", block.nHeight);
 			}
 		}
-		
-		///** Don't Request Anything if Waiting for New Round to Reset. **/
-		if (m_coinbase_pending || Core::fSubmittingBlock || Core::fNewRound || fCoinbasePending)
-			return;
-
 
 		///** Reset The Daemon if there is a New Block. **/
-		//if (fNewBlock)
-		//{
-		//	fNewBlock = false;
+		if (m_new_block)
+		{
+			m_new_block = false;
 
 		//	NewBlock();
 		//	//printf("[DAEMON] Niro Network: New Block | Reset Daemon Handle %u\n", ID);
 
-		//	/** Set the new Coinbase Transaction. **/
-		//	if (Core::nCurrentRound > 1)
-		//	{
-		//		fCoinbasePending = true;
-		//		CLIENT->SetCoinbase();
-
-		//		continue;
-		//	}
-		//}
-
-		//}
-		//}
+			/** Set the new Coinbase Transaction. **/
+			if (data_registry->m_current_round > 1)
+			{
+				m_coinbase_pending = true;
+				Coinbase_mt& coinbase = data_registry->get_coinbase();
+				Daemon_packet daemon_packet;
+				Packet packet = daemon_packet.set_coinbase(coinbase.serialize());
+				m_connection->transmit(packet.get_bytes());
+			}
+		}
 	}
 
+	void Daemon_connection::new_round(std::shared_ptr<Data_registry> data_registry)
+	{
+	//	STATSCOLLECTOR.SaveCurrentRound();
+		m_new_block = true;
+		data_registry->get_payout_manager().update_balances(data_registry, m_round_reward, m_hash_submit_block, m_last_blockfinder);
+		data_registry->get_payout_manager().clear_shares(data_registry);
+		data_registry->m_current_round++;
+
+		for (auto& pool_data : m_pool_connections)
+		{
+			auto pool_connection = pool_data.m_connection.lock();
+			if (!pool_connection)
+			{
+				continue;
+			}
+			pool_connection->new_round();
+		}
+	}
 
 	/** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
 	LLP::CBlock Daemon_connection::deserialize_block(network::Shared_payload data)

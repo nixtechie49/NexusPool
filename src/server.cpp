@@ -58,13 +58,11 @@ bool Server::init()
 
 	network::Endpoint listen_endpoint{ network::Transport_protocol::tcp, "127.0.0.1", m_config.get_port() };
 	m_listen_socket = socket_factory->create_socket(listen_endpoint);
-	
-	auto daemon_maintenance_timer = timer_factory->create_timer();
 
 	network::Endpoint local_ep{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
 	m_daemon_connection = std::make_shared<Daemon_connection>(std::move(socket_factory->create_socket(local_ep)), 
 															  m_data_registry,
-															  std::move(daemon_maintenance_timer));
+															  timer_factory);
 	
 	// timer
 	m_maintenance_timer = timer_factory->create_timer();

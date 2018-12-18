@@ -16,6 +16,7 @@ namespace nexuspool
 		, m_use_ddos{ m_config.get_use_ddos()}
 		, m_coinbase{}
 		, m_coinbase_mt{m_coinbase}
+		, m_current_round{1}
 	{
 
 	}

@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <utility>
+#include <spdlog/spdlog.h>
 
 #include "utils.hpp"
 
@@ -137,15 +138,17 @@ namespace nexuspool
 
 
 		/** Output the Transactions in the Coinbase Container. **/
-		void Print()
+		void Print(std::shared_ptr<spdlog::logger> logger) const
 		{
-			printf("\n\n++++++++++++++++++++++++++++ COINBASE ++++++++++++++++++++++++++++++++\n\n");
-			for (std::map<std::string, uint64_t>::iterator nIterator = mapOutputs.begin(); nIterator != mapOutputs.end(); nIterator++)
-				printf("Coinbase: %s:%f\n", nIterator->first.c_str(), nIterator->second / 1000000.0);
+			logger->info("\n\n++++++++++++++++++++++++++++ COINBASE ++++++++++++++++++++++++++++++++\n\n");
+			for (std::map<std::string, uint64_t>::const_iterator nIterator = mapOutputs.begin(); nIterator != mapOutputs.end(); nIterator++)
+			{
+				logger->info("Coinbase: {0}:{1}\n", nIterator->first, nIterator->second / 1000000.0);
+			}				
 
-			printf("\n\nIs Complete: %s\n", IsComplete() ? "TRUE" : "FALSE");
-			printf("\n\nMax Value: %llu Current Value: %llu PoolFee: %llu\n", nMaxValue, nCurrentValue, nPoolFee);
-			printf("\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
+			logger->info("\n\nIs Complete: {}\n", IsComplete() ? "TRUE" : "FALSE");
+			logger->info("\n\nMax Value: {0} Current Value: {1} PoolFee: {2}\n", nMaxValue, nCurrentValue, nPoolFee);
+			logger->info("\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
 		}
 	};
 
@@ -220,15 +223,16 @@ namespace nexuspool
 			}
 		}
 
-
 		/** Output the Transactions in the Coinbase Container. **/
-		void Print() const
+		void Print(std::shared_ptr<spdlog::logger> logger) const
 		{
-			printf("\n\n ++++++++++++++++++++++++++++++++ CREDITS ++++++++++++++++++++++++++++++++++++++++++ \n\n");
+			logger->info("\n\n ++++++++++++++++++++++++++++++++ CREDITS ++++++++++++++++++++++++++++++++++++++++++ \n\n");
 			for (std::map<std::string, uint64_t>::const_iterator nIterator = mapCredits.begin(); nIterator != mapCredits.end(); ++nIterator)
-				printf("Credit: %s:%f\n", nIterator->first.c_str(), nIterator->second / 1000000.0);
+			{
+				logger->info("Credit: {0}:{1}\n", nIterator->first, nIterator->second / 1000000.0);
+			}
 
-			printf("\n\n +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\n");
+			logger->info("\n\n +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\n");
 		}
 	};
 
@@ -238,6 +242,9 @@ namespace nexuspool
 	public:
 
 		explicit Coinbase_mt(Coinbase& coinbase) : m_coinbase{ coinbase } {}
+
+		// payout_manager needs the coinbase for blockDB
+		Coinbase const& get_coinbase() const { return m_coinbase; }
 
 		/** Reset the Coinbase Transaction for a new Round. **/
 		void reset(uint64_t nMax)
@@ -282,6 +289,14 @@ namespace nexuspool
 			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
 			return m_coinbase.IsComplete();
 		}
+
+		void print(std::shared_ptr<spdlog::logger> logger) const
+		{
+			std::lock_guard<std::mutex> lk(m_map_outputs_mutex);
+			m_coinbase.Print(std::move(logger));
+		}
+
+		uint64_t& get_pool_fee() { return m_coinbase.nPoolFee; }
 
 	private:
 

@@ -5,6 +5,7 @@
 #include "../coinbase.hpp"
 #include "../hash/uint1024.h"
 #include "../utils.hpp"
+#include <spdlog/spdlog.h>
 
 using namespace nexuspool;
 
@@ -130,7 +131,12 @@ namespace LLD
 			return vData;
 		}
 		
-		void Print() { printf("Hash = %s\n", cKey.ToString().c_str()); cCoinbase.Print(); cCredits.Print(); }
+		void Print(std::shared_ptr<spdlog::logger> logger) 
+		{ 
+			logger->debug("Hash = {}\n", cKey.ToString()); 
+			cCoinbase.Print(logger); 
+			cCredits.Print(logger); 
+		}
 	};
 }
 

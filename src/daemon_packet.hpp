@@ -26,11 +26,8 @@ namespace nexuspool
 			GOOD_BLOCK = 6,
 			ORPHAN_BLOCK = 7,
 
-
 			/** DATA REQUESTS **/
 			CHECK_BLOCK = 64,
-
-
 
 			/** REQUEST PACKETS **/
 			GET_BLOCK = 129,

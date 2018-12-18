@@ -30,6 +30,7 @@
     <ClCompile Include="..\src\hash\skein.cpp" />
     <ClCompile Include="..\src\hash\skein_block.cpp" />
     <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\payout_manager.cpp" />
     <ClCompile Include="..\src\pool_connection.cpp" />
     <ClCompile Include="..\src\server.cpp" />
     <ClCompile Include="..\src\stats_collector.cpp" />
@@ -63,6 +64,7 @@
     <ClInclude Include="..\src\LLP\ddos.hpp" />
     <ClInclude Include="..\src\LLP\timer.hpp" />
     <ClInclude Include="..\src\packet.hpp" />
+    <ClInclude Include="..\src\payout_manager.hpp" />
     <ClInclude Include="..\src\pool_connection.hpp" />
     <ClInclude Include="..\src\prime.hpp" />
     <ClInclude Include="..\src\server.hpp" />

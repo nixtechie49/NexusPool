@@ -18,6 +18,7 @@ public:
 	bool get_use_ddos() const { return m_use_ddos; }
 
 	uint32_t get_min_share() const { return m_min_share; }
+	uint32_t get_pool_fee() const { return m_pool_fee; }
 
 	std::string const& get_logfile() const { return m_logfile; }
 	std::string const& get_database_type() const { return m_database_type; }
@@ -35,7 +36,7 @@ private:
 	int          m_r_score;
 	int          m_c_score;
 	uint32_t     m_min_share;
-	int          m_pool_fee;
+	uint32_t     m_pool_fee;
 	std::string  m_logfile;
 	std::string  m_database_type;
 	std::string  m_database_file;

@@ -51,7 +51,8 @@ namespace nexuspool
 				self->m_logger->info("Connection to wallet established");
 				self->m_maintenance_timer->start(chrono::Seconds(60), self->maintenance_timer_handler());
 				self->m_block_timer->start(chrono::Milliseconds(50), self->block_timer_handler());
-				self->m_orphan_check_timer->start(chrono::Seconds(20), self->orphan_check_timer_handler());				
+				self->m_orphan_check_timer->start(chrono::Seconds(20), self->orphan_check_timer_handler());			
+				self->m_get_height_timer->start(chrono::Seconds(2), self->get_height_timer_handler());
 
 				// set channel
 				Daemon_packet daemon_packet;
@@ -72,6 +73,37 @@ namespace nexuspool
 
 		m_connection = std::move(connection);
 		return true;
+	}
+
+	chrono::Timer::Handler Daemon_connection::get_height_timer_handler()
+	{
+		return[self = shared_from_this()](bool canceled)
+		{
+			if (canceled)	// don't do anything if the timer has been canceled
+			{
+				return;
+			}
+
+			Daemon_packet daemon_packet;
+			Packet packet_height = daemon_packet.get_height();
+			self->m_connection->transmit(packet_height.get_bytes());
+
+			Packet packet_round = daemon_packet.get_round();
+			self->m_connection->transmit(packet_round.get_bytes());
+
+			if (self->m_coinbase_pending)
+			{
+				self->m_logger->debug("Daemon: Getting Reward\n");
+				
+				Packet packet_reward = daemon_packet.get_reward();
+				self->m_connection->transmit(packet_reward.get_bytes());
+			}
+
+			self->m_logger->debug("[MASTER] Checking Round\n");
+
+			// start the timer again
+			self->m_get_height_timer->start(chrono::Seconds(2), self->get_height_timer_handler());
+		};
 	}
 	
 	chrono::Timer::Handler Daemon_connection::maintenance_timer_handler()

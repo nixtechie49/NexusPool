@@ -71,6 +71,7 @@ namespace nexuspool
 		chrono::Timer::Handler maintenance_timer_handler();
 		chrono::Timer::Handler block_timer_handler();
 		chrono::Timer::Handler orphan_check_timer_handler();
+		chrono::Timer::Handler get_height_timer_handler();
 
 		void new_round(std::shared_ptr<Data_registry> data_registry);
 
@@ -84,6 +85,7 @@ namespace nexuspool
 		chrono::Timer::Uptr m_maintenance_timer;	// timer to delete non existing pool_connections from list
 		chrono::Timer::Uptr m_block_timer;			// timer for requesting/submitting blocks
 		chrono::Timer::Uptr m_orphan_check_timer;	// timer for checking of orphan blocks and payout refunding
+		chrono::Timer::Uptr m_get_height_timer;		// timer for getting height/reward of wallet
 		std::shared_ptr<spdlog::logger> m_logger;
 		std::vector<Pool_connection_data> m_pool_connections;
 		std::mutex m_pool_connections_mutex;

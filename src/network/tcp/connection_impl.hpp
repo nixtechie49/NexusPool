@@ -78,7 +78,7 @@ inline Connection_impl<ProtocolDescriptionType>::Connection_impl(
     , m_asio_socket{std::move(asio_socket)}
     , m_remote_endpoint{std::move(remote_endpoint)}
     , m_local_endpoint{}     // will be set later, this constructor is called in accept/listen case
-    , m_connection_handler{} // will be set later, this constructor is called in accept/listen case
+	, m_connection_handler{} // will be set later, this constructor is called in accept/listen case
 {
 }
 
@@ -202,6 +202,8 @@ inline void Connection_impl<ProtocolDescriptionType>::handle_accept(Connection::
     m_connection_handler = std::move(connection_handler);
     m_local_endpoint = Endpoint(m_asio_socket->local_endpoint());
 	m_connection_handler(Result::connection_ok, Shared_payload{});
+
+	receive();
 }
 
 

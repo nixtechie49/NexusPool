@@ -140,15 +140,15 @@ namespace nexuspool
 		/** Output the Transactions in the Coinbase Container. **/
 		void Print(std::shared_ptr<spdlog::logger> logger) const
 		{
-			logger->info("\n\n++++++++++++++++++++++++++++ COINBASE ++++++++++++++++++++++++++++++++\n\n");
+			logger->info("++++++++++++++++ COINBASE +++++++++++++++++++++");
 			for (std::map<std::string, uint64_t>::const_iterator nIterator = mapOutputs.begin(); nIterator != mapOutputs.end(); nIterator++)
 			{
-				logger->info("Coinbase: {0}:{1}\n", nIterator->first, nIterator->second / 1000000.0);
+				logger->info("Coinbase: {0}:{1}", nIterator->first, nIterator->second / 1000000.0);
 			}				
 
-			logger->info("\n\nIs Complete: {}\n", IsComplete() ? "TRUE" : "FALSE");
-			logger->info("\n\nMax Value: {0} Current Value: {1} PoolFee: {2}\n", nMaxValue, nCurrentValue, nPoolFee);
-			logger->info("\n\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
+			logger->info("Is Complete: {}", IsComplete() ? "TRUE" : "FALSE");
+			logger->info("Max Value: {0} Current Value: {1} PoolFee: {2}", nMaxValue, nCurrentValue, nPoolFee);
+			logger->info("++++++++++++++++++++++++++++++++++++++++++++++++");
 		}
 	};
 
@@ -226,13 +226,13 @@ namespace nexuspool
 		/** Output the Transactions in the Coinbase Container. **/
 		void Print(std::shared_ptr<spdlog::logger> logger) const
 		{
-			logger->info("\n\n ++++++++++++++++++++++++++++++++ CREDITS ++++++++++++++++++++++++++++++++++++++++++ \n\n");
+			logger->info("+++++++++++++++++++++++++ CREDITS +++++++++++++++++++++++++++++++");
 			for (std::map<std::string, uint64_t>::const_iterator nIterator = mapCredits.begin(); nIterator != mapCredits.end(); ++nIterator)
 			{
-				logger->info("Credit: {0}:{1}\n", nIterator->first, nIterator->second / 1000000.0);
+				logger->info("Credit: {0}:{1}", nIterator->first, nIterator->second / 1000000.0);
 			}
 
-			logger->info("\n\n +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ \n\n");
+			logger->info("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
 		}
 	};
 

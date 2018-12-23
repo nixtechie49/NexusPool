@@ -27,6 +27,7 @@ namespace nexuspool
 		m_maintenance_timer = m_timer_factory->create_timer();
 		m_block_timer = m_timer_factory->create_timer();
 		m_orphan_check_timer = m_timer_factory->create_timer();
+		m_get_height_timer = m_timer_factory->create_timer();
 	}
 
 	Daemon_connection::~Daemon_connection()
@@ -40,6 +41,7 @@ namespace nexuspool
 		{
 			if (result == network::Result::connection_declined ||
 				result == network::Result::connection_aborted ||
+				result == network::Result::connection_closed ||
 				result == network::Result::connection_error)
 			{
 				self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
@@ -51,7 +53,7 @@ namespace nexuspool
 				self->m_logger->info("Connection to wallet established");
 				self->m_maintenance_timer->start(chrono::Seconds(60), self->maintenance_timer_handler());
 				self->m_block_timer->start(chrono::Milliseconds(50), self->block_timer_handler());
-				self->m_orphan_check_timer->start(chrono::Seconds(20), self->orphan_check_timer_handler());			
+			//	self->m_orphan_check_timer->start(chrono::Seconds(20), self->orphan_check_timer_handler());			
 				self->m_get_height_timer->start(chrono::Seconds(2), self->get_height_timer_handler());
 
 				// set channel
@@ -93,13 +95,13 @@ namespace nexuspool
 
 			if (self->m_coinbase_pending)
 			{
-				self->m_logger->debug("Daemon: Getting Reward\n");
+		//		self->m_logger->debug("Daemon: Getting Reward");
 				
 				Packet packet_reward = daemon_packet.get_reward();
 				self->m_connection->transmit(packet_reward.get_bytes());
 			}
 
-			self->m_logger->debug("[MASTER] Checking Round\n");
+	//		self->m_logger->debug("[MASTER] Checking Round");
 
 			// start the timer again
 			self->m_get_height_timer->start(chrono::Seconds(2), self->get_height_timer_handler());
@@ -271,8 +273,6 @@ namespace nexuspool
 	
 	Pool_connection_data& Daemon_connection::find_pool_connection(std::string const& ip_address)
 	{
-		std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
-
 		auto find_iter = std::find_if(m_pool_connections.begin(), m_pool_connections.end(),
 			[&ip_address](const Pool_connection_data& pool_connection_data) 
 		{ 
@@ -318,19 +318,15 @@ namespace nexuspool
 
 	void Daemon_connection::process_data(network::Shared_payload&& receive_buffer)
 	{
-		if ((*receive_buffer).size() < 5)
-		{
-			m_logger->error("Received too small buffer from wallet. Size: {}", (*receive_buffer).size());
-			return;
-		}
-
-		Packet packet{ std::move(receive_buffer) };
+		Daemon_packet packet{ std::move(receive_buffer) };
 		if (!packet.is_valid())
 		{
 			// log invalid packet
-			m_logger->error("Received packet is invalid");
+			m_logger->error("Received packet is invalid. Header: {0}", packet.m_header);
 			return;
 		}
+
+	//	m_logger->debug("Received header: {0}", packet.m_header);
 		
 		//obtain ptr to data_registry
 		auto data_registry = m_data_registry.lock();
@@ -350,11 +346,9 @@ namespace nexuspool
 			if (height > data_registry->m_best_height)
 			{
 				m_logger->info("Daemon: Nexus Network: New Block [Height] {}", height);
+				data_registry->m_best_height = height;
 				m_coinbase_pending = true;
-
-			}
-
-			data_registry->m_best_height = height;
+			}			
 		}
 		/** Response from Mining LLP that there is a new block. **/
 		else if(packet.m_header == Daemon_packet::NEW_ROUND)
@@ -440,7 +434,7 @@ namespace nexuspool
 			uint1024 hashOrphan;
 			hashOrphan.SetBytes(*packet.m_data);
 
-			m_logger->info("Daemon: Block {0} - Round {1} Has Been Orphaned\n", hashOrphan.ToString().substr(0, 20), data_registry->m_block_db->GetRecord(hashOrphan).nRound);
+			m_logger->info("Daemon: Block {0} - Round {1} Has Been Orphaned", hashOrphan.ToString().substr(0, 20), data_registry->m_block_db->GetRecord(hashOrphan).nRound);
 			data_registry->get_payout_manager().refund_payouts(data_registry, hashOrphan);
 
 			m_coinbase_pending = true;
@@ -450,7 +444,7 @@ namespace nexuspool
 			uint1024 hashBlock;
 			hashBlock.SetBytes(*packet.m_data);
 
-			m_logger->info("Daemon: Block {0} - Round: {1} Is in Main Chain\n", hashBlock.ToString().substr(0, 20), data_registry->m_block_db->GetRecord(hashBlock).nRound);
+			m_logger->info("Daemon: Block {0} - Round: {1} Is in Main Chain", hashBlock.ToString().substr(0, 20), data_registry->m_block_db->GetRecord(hashBlock).nRound);
 		}
 
 		// BLOCK stuff
@@ -458,6 +452,10 @@ namespace nexuspool
 		else if (packet.m_header == Daemon_packet::GOOD)
 		{
 			m_logger->info("Daemon: Block {} accepted.", m_hash_submit_block.ToString().substr(0, 20));
+			data_registry->get_payout_manager().update_balances(data_registry, m_round_reward, m_hash_submit_block, m_last_blockfinder);
+			data_registry->get_payout_manager().clear_shares(data_registry);
+			data_registry->m_current_round++;
+
 			new_round(data_registry);
 
 		//	Core::fSubmittingBlock = false;
@@ -524,11 +522,15 @@ namespace nexuspool
 			/** Set the new Coinbase Transaction. **/
 			if (data_registry->m_current_round > 1)
 			{
-				m_coinbase_pending = true;
+			//	m_coinbase_pending = true;
 				Coinbase_mt& coinbase = data_registry->get_coinbase();
 				Daemon_packet daemon_packet;
 				Packet packet = daemon_packet.set_coinbase(coinbase.serialize());
 				m_connection->transmit(packet.get_bytes());
+			}
+			else
+			{
+				m_coinbase_pending = false;
 			}
 		}
 	}
@@ -537,9 +539,7 @@ namespace nexuspool
 	{
 	//	STATSCOLLECTOR.SaveCurrentRound();
 		m_new_block = true;
-		data_registry->get_payout_manager().update_balances(data_registry, m_round_reward, m_hash_submit_block, m_last_blockfinder);
-		data_registry->get_payout_manager().clear_shares(data_registry);
-		data_registry->m_current_round++;
+
 
 		for (auto& pool_data : m_pool_connections)
 		{

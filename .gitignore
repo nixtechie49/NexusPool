@@ -18,3 +18,4 @@
 *.opendb
 build/
 vs2017/.vs/
+vs2017/MinerSimulator/

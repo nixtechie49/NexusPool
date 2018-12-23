@@ -41,7 +41,7 @@ namespace nexuspool
 	// Update the Account Balances from Weights in Current Round.
 	void Payout_manager::update_balances(std::shared_ptr<Data_registry> data_registry, uint64_t reward, uint1024 hash_submit_block, std::string const& last_blockfinder) const
 	{
-		m_logger->info("\n---------------------------------------------------\n\n");
+		m_logger->info("-----------------------------------");
 		time_t tTime = time(0);
 
 		/** Create a New Block Record to Track Payouts. **/
@@ -66,7 +66,7 @@ namespace nexuspool
 
 		//	STATSCOLLECTOR.AddAccountEarnings(last_blockfinder, data_registry->m_current_round, data_registry->m_best_height, 0, credit, tTime);
 
-			m_logger->info("[ACCOUNT] Block Finder Bonus to {0} of {1} NXS\n", last_blockfinder, credit / 1000000.0);
+			m_logger->info("[ACCOUNT] Block Finder Bonus to {0} of {1} NXS", last_blockfinder, credit / 1000000.0);
 
 			reward -= credit;
 		}
@@ -117,7 +117,7 @@ namespace nexuspool
 			// save stats
 		//	STATSCOLLECTOR.AddAccountEarnings(vKeys[nIndex], data_registry->m_current_round, data_registry->m_best_height, cAccount.nRoundShares, nCredit, tTime);
 
-			m_logger->info("[ACCOUNT] Account: {0} | Credit: {1} NXS | Balance: {3} NXS\n", cAccount.cKey, nCredit / 1000000.0, cAccount.nAccountBalance / 1000000.0);
+			m_logger->info("[ACCOUNT] Account: {0} | Credit: {1} NXS | Balance: {3} NXS", cAccount.cKey, nCredit / 1000000.0, cAccount.nAccountBalance / 1000000.0);
 		}
 
 		/** Any Remainder of the Rewards give to Blockfinder. **/
@@ -129,7 +129,7 @@ namespace nexuspool
 
 		//	STATSCOLLECTOR.AddAccountEarnings(last_blockfinder, data_registry->m_current_round, data_registry->m_best_height, 0, (reward - nTotalReward), tTime);
 
-			m_logger->info("[ACCOUNT] Block Finder Additional Credit to {0} of {1} NXS\n", last_blockfinder, (reward - nTotalReward) / 1000000.0);
+			m_logger->info("[ACCOUNT] Block Finder Additional Credit to {0} of {1} NXS", last_blockfinder, (reward - nTotalReward) / 1000000.0);
 		}
 
 		/** Commit the New Block Record to the Block Database. **/
@@ -140,8 +140,8 @@ namespace nexuspool
 		/** Commit the Account Changes to Database. **/
 		data_registry->m_account_db->WriteToDisk();
 
-		m_logger->info("[ACCOUNT] Balances Updated. Total Round Weight = {0} | Total Round Reward: {1} NXS\n", nTotalWeight / 1000000.0, reward / 1000000.0);
-		m_logger->info("\n---------------------------------------------------\n\n");
+		m_logger->info("[ACCOUNT] Balances Updated. Total Round Weight = {0} | Total Round Reward: {1} NXS", nTotalWeight / 1000000.0, reward / 1000000.0);
+		m_logger->info("--------------------------------------");
 	}
 
 	/** Refund the Payouts if the Block was Orphaned. **/
@@ -160,7 +160,7 @@ namespace nexuspool
 		/** Set the Flag that Block is an Orphan. **/
 		cBlock.nCoinbaseValue = 0;
 
-		m_logger->info("\n---------------------------------------------------\n\n");
+		m_logger->info("-----------------------------------");
 		/** Clear out the Credits for the Round. **/
 		for (std::map<std::string, uint64>::const_iterator nIterator = cBlock.cCredits.mapCredits.begin(); nIterator != cBlock.cCredits.mapCredits.end(); nIterator++)
 		{
@@ -170,7 +170,7 @@ namespace nexuspool
 			else
 				cAccount.nAccountBalance -= nIterator->second;
 
-			m_logger->info("[MASTER] Account {0} Removed {1} Credits\n", nIterator->first, nIterator->second / 1000000.0);
+			m_logger->info("[MASTER] Account {0} Removed {1} Credits", nIterator->first, nIterator->second / 1000000.0);
 			data_registry->m_account_db->UpdateRecord(cAccount);
 
 //			STATSCOLLECTOR.DeleteAccountEarnings(nIterator->first, nRoundToRefund);
@@ -188,7 +188,7 @@ namespace nexuspool
 		//	STATSCOLLECTOR.DeleteAccountPayment(nIterator->first, nRoundToRefund);
 		}
 
-		m_logger->info("\n---------------------------------------------------\n\n");
+		m_logger->info("---------------------------------");
 
 		/** Update the Record into the Database. **/
 		data_registry->m_block_db->UpdateRecord(cBlock);

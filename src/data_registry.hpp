@@ -24,7 +24,7 @@ namespace nexuspool
 
 	using Banned_users_file = Banned_users<Banned_persister_file>;
 
-	class Data_registry : std::enable_shared_from_this<Data_registry>
+	class Data_registry : public std::enable_shared_from_this<Data_registry>
 	{
 	public:
 

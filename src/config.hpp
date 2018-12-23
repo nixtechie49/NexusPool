@@ -14,6 +14,7 @@ public:
 
 	std::string const& get_wallet_ip() const { return m_wallet_ip; }
 	uint16_t get_port() const { return m_port; }
+	uint16_t get_pool_port() const { return m_pool_port; }
 	uint32_t get_connection_threads() const { return m_connection_threads; }
 	bool get_use_ddos() const { return m_use_ddos; }
 
@@ -26,11 +27,16 @@ public:
 	
 	uint32_t get_maintenance_timer_seconds() const { return m_maintenance_timer_seconds; }	
 	uint32_t get_persistance_timer_seconds() const { return m_persistance_timer_seconds; }
+	uint32_t get_block_timer_milliseconds() const { return m_block_timer_milliseconds; }	
+	uint32_t get_orphan_check_timer_seconds() const { return m_orphan_check_timer_seconds; }
+	uint32_t get_request_timer_seconds() const { return m_request_timer_seconds; }	
+
 
 private:
 
 	std::string  m_wallet_ip;
 	uint16_t     m_port;
+	uint16_t     m_pool_port;
 	uint32_t     m_connection_threads;
 	bool         m_use_ddos;
 	int          m_r_score;
@@ -43,6 +49,9 @@ private:
 	
 	uint32_t	 m_maintenance_timer_seconds;
 	uint32_t	 m_persistance_timer_seconds;
+	uint32_t	 m_block_timer_milliseconds;
+	uint32_t	 m_orphan_check_timer_seconds;
+	uint32_t	 m_request_timer_seconds;
 	
 
 	std::string  strStatsDBServerIP;

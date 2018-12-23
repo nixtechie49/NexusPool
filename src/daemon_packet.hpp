@@ -58,6 +58,53 @@ namespace nexuspool
 			CLOSE = 254
 		};
 
+		Daemon_packet() : m_header{ 255 }, m_length{ 0 }
+		{
+		}
+		// creates a packet from received buffer
+		explicit Daemon_packet(network::Shared_payload buffer)
+		{
+			m_header = (*buffer)[0];
+			m_length = 0;
+			if (buffer->size() > 1)
+			{
+				m_length = ((*buffer)[1] << 24) + ((*buffer)[2] << 16) + ((*buffer)[3] << 8) + ((*buffer)[4]);
+				m_data = std::make_shared<std::vector<uint8_t>>(buffer->begin() + 5, buffer->end());
+			}
+
+		}
+
+		/** Components of an LLP Packet.
+	BYTE 0       : Header
+	BYTE 1 - 5   : Length
+	BYTE 6 - End : Data      **/
+		uint8_t			m_header;
+		uint32_t		m_length;
+		network::Shared_payload m_data;
+
+		inline bool is_valid() const
+		{
+			return ((m_header < 128 && m_length > 0) || (m_header >= 128 && m_header < 255 && m_length == 0));
+		}
+
+		network::Shared_payload get_bytes()
+		{
+			std::vector<uint8_t> BYTES(1, m_header);
+
+			/** Handle for Data Packets. **/
+			if (m_header < 128)
+			{
+				BYTES.push_back((m_length >> 24));
+				BYTES.push_back((m_length >> 16));
+				BYTES.push_back((m_length >> 8));
+				BYTES.push_back(m_length);
+
+				BYTES.insert(BYTES.end(), m_data->begin(), m_data->end());
+			}
+
+			return std::make_shared<std::vector<uint8_t>>(BYTES);
+		}
+
 		// Get a new Block from the Daemon Server
 		inline Packet get_block() const
 		{

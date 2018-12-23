@@ -4,12 +4,15 @@
 #include "config.hpp"
 #include "chrono/timer.hpp"
 
+
 #include <thread>
 #include <vector>
 #include <memory>
 #include <mutex>
 
-namespace asio { class io_context; }
+namespace asio {
+	class io_context; class signal_set;
+}
 namespace nexuspool
 {
 namespace network { class Socket; class Component; }
@@ -47,6 +50,7 @@ private:
 	Config m_config;
 
 	std::shared_ptr<Data_registry> m_data_registry;
+	std::shared_ptr<::asio::signal_set> m_signals;
 };
 
 }

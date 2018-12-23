@@ -83,8 +83,7 @@ inline void Socket_impl<ProtocolDescriptionType>::accept(Connect_handler handler
 			auto connection = std::make_shared<Connection_impl<ProtocolDescriptionType>>(
 				self->m_io_context, std::move(new_connection_socket), std::move(remote_ep));
 
-			Connection::Handler connection_handler = handler(std::move(connection));
-
+			Connection::Handler connection_handler = handler(connection);
 			connection->handle_accept(std::move(connection_handler));
 
 			self->accept(handler);

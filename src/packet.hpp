@@ -50,10 +50,20 @@ namespace nexuspool
 		// creates a packet from received buffer
 		explicit Packet(network::Shared_payload buffer)
 		{
-			uint8_t m_header = (*buffer)[0];
-			int32_t m_length = ((*buffer)[1] << 24) + ((*buffer)[2] << 16) + ((*buffer)[3] << 8) + ((*buffer)[4]);
-
-			m_data = std::make_shared<std::vector<uint8_t>>(*buffer);
+			if(buffer->empty())
+			{
+				m_header = 255;
+			}
+			else
+			{
+				m_header = (*buffer)[0];
+			}
+			m_length = 0;
+			if (buffer->size() > 1)
+			{
+				m_length = ((*buffer)[1] << 24) + ((*buffer)[2] << 16) + ((*buffer)[3] << 8) + ((*buffer)[4]);
+				m_data = std::make_shared<std::vector<uint8_t>>(buffer->begin() + 5, buffer->end());
+			}
 		}
 
         /** Components of an LLP Packet.
@@ -66,12 +76,8 @@ namespace nexuspool
 
 		inline bool is_valid() const
 		{
-			if ((*m_data).size() < 5)	// header (uint8_t) + length (int)
-			{
-				return false;
-			}
-
-			return ((m_header < 128 && m_length > 0) || (m_header >= 128 && m_header < 255 && m_length == 0));
+			// m_header == 0 because of LOGIN message
+			return ((m_header == 0 && m_length == 0) ||(m_header < 128 && m_length > 0) || (m_header >= 128 && m_header < 255 && m_length == 0));
 		}
 
 		network::Shared_payload get_bytes()

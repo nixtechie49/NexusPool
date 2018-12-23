@@ -10,14 +10,33 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
-#include <functional>
+#include <asio/signal_set.hpp>
+
+#include <chrono>
 
 namespace nexuspool
 {
 
 Server::Server()
 	: m_io_context{std::make_shared<::asio::io_context>()}
+	, m_signals{std::make_shared<::asio::signal_set>(*m_io_context)}
 {
+	// Register to handle the signals that indicate when the server should exit.
+// It is safe to register for the same signal multiple times in a program,
+// provided all registration for the specified signal is made through Asio.
+	m_signals->add(SIGINT);
+	m_signals->add(SIGTERM);
+#if defined(SIGQUIT)
+	m_signals->add(SIGQUIT);
+#endif // defined(SIGQUIT)
+
+	m_signals->async_wait([this](auto, auto)
+	{
+		m_io_context->stop();
+		// Wait for all threads in the pool to exit.
+		for (std::size_t i = 0; i < m_io_threads.size(); ++i)
+			m_io_threads[i].join();
+	});
 }
 
 Server::~Server()
@@ -36,13 +55,17 @@ bool Server::init()
 	}		
 
 	auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-	if (!m_config.get_logfile().empty())
-	{	// if logfile available, only log level "info" and above to console
-		console_sink->set_level(spdlog::level::info);
-	}
+	//if (!m_config.get_logfile().empty())
+	//{	// if logfile available, only log level "info" and above to console
+	//	console_sink->set_level(spdlog::level::info);
+	//}
 	// 10 mb logfiles, 5
-	auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(m_config.get_logfile(), 1048576 * 10, 5);
-	spdlog::logger multi_sink("logger", { console_sink, file_sink });
+	//auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(m_config.get_logfile(), 1048576 * 10, 5);
+	//spdlog::logger multi_sink("logger", { console_sink, file_sink });
+	//spdlog::logger multi_sink("logger", { console_sink });
+
+	auto logger = spdlog::stdout_color_mt("logger");
+	logger->set_level(spdlog::level::debug);
 
 	// std::err logger
 	auto console_err = spdlog::stderr_color_mt("console_err");
@@ -56,7 +79,7 @@ bool Server::init()
 	m_network_component = network::create_component(m_io_context);
 	auto socket_factory = m_network_component->get_socket_factory();
 
-	network::Endpoint listen_endpoint{ network::Transport_protocol::tcp, "127.0.0.1", m_config.get_port() };
+	network::Endpoint listen_endpoint{ network::Transport_protocol::tcp, "127.0.0.1", m_config.get_pool_port() };
 	m_listen_socket = socket_factory->create_socket(listen_endpoint);
 
 	network::Endpoint local_ep{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
@@ -73,16 +96,9 @@ bool Server::init()
 void Server::run()
 {
 	auto logger = spdlog::get("logger");
-	// Create a pool of threads to run all of the io_services.
-	::asio::executor_work_guard<::asio::io_context::executor_type> work = ::asio::make_work_guard(*m_io_context);
-	std::vector<std::thread> io_threads;
-	for (std::size_t i = 0; i < m_config.get_connection_threads(); ++i)
-	{
-		m_io_threads.push_back(std::thread([io_context = m_io_context]() { io_context->run(); }));
-	}
 
 	// connect daemon to wallet	
-	if (!m_daemon_connection->connect(network::Endpoint{ network::Transport_protocol::tcp, m_config.get_wallet_ip(), 9325 }))
+	if (!m_daemon_connection->connect(network::Endpoint{ network::Transport_protocol::tcp, m_config.get_wallet_ip(), m_config.get_port() }))
 	{
 		logger->critical("Couldn't connect to wallet using ip {}", m_config.get_wallet_ip());
 		return;
@@ -94,7 +110,7 @@ void Server::run()
 	// on listen/accept, save created connection to pool_conenctions and call the connection_handler of created pool connection object
 	network::Socket::Connect_handler socket_handler = [this](network::Connection::Sptr&& connection)
 	{
-		auto pool_connection = std::make_shared<Pool_connection>(std::move(connection), m_daemon_connection, m_data_registry);
+		auto pool_connection = std::make_shared<Pool_connection>(std::move(connection), m_daemon_connection, m_data_registry);		
 		
 		std::lock_guard<std::mutex> lk(m_pool_connections_mutex);
 		m_pool_connections.push_back(pool_connection);
@@ -102,6 +118,13 @@ void Server::run()
 	};
 
 	m_listen_socket->listen(socket_handler);
+
+	//for (std::size_t i = 0; i < m_config.get_connection_threads(); ++i)
+	//{
+	//	m_io_threads.push_back(std::thread([io_context = m_io_context]() { io_context->run(); }));
+	//}
+
+	m_io_context->run();
 }
 
 chrono::Timer::Handler Server::maintenance_timer_handler()

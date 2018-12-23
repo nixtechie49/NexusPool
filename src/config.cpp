@@ -11,7 +11,8 @@ namespace nexuspool
 {
 	Config::Config()
 		: m_wallet_ip{ "127.0.0.1" }
-		, m_port{ 9549 }
+		, m_port{ 9323 }
+		, m_pool_port{ 9549 }
 		, m_connection_threads{ 20 }
 		, m_use_ddos{true}
 		, m_r_score{20}
@@ -23,6 +24,9 @@ namespace nexuspool
 		, m_database_file{""}
 		, m_maintenance_timer_seconds{60}
 		, m_persistance_timer_seconds{10}
+		, m_block_timer_milliseconds{50}
+		, m_orphan_check_timer_seconds{20}
+		, m_request_timer_seconds{2}
 	{
 		strStatsDBServerIP = "127.0.0.1";
 		nStatsDBServerPort = 3306;
@@ -30,7 +34,6 @@ namespace nexuspool
 		strStatsDBPassword = "mysql";
 		nSaveConnectionStatsFrequency = 10;
 		nSaveConnectionStatsSeriesFrequency = 300;
-
 	}
 
 	void Config::print_config() const
@@ -39,6 +42,7 @@ namespace nexuspool
 		std::cout << "-------------" << std::endl;
 		std::cout << "Wallet IP: " << m_wallet_ip << std::endl;
 		std::cout << "Port: " << m_port << std::endl;
+		std::cout << "Pool Port: " << m_pool_port << std::endl;
 
 		std::cout << "Connection Threads: " << m_connection_threads << std::endl;
 
@@ -51,8 +55,6 @@ namespace nexuspool
 		std::cout << "Logfile: " << m_logfile << std::endl;
 		std::cout << "Database: " << m_database_type << std::endl;
 		std::cout << "Database File: " << m_database_file << std::endl;
-		std::cout << "Maintenance timer (seconds): " << m_maintenance_timer_seconds << std::endl;
-		std::cout << "Persistance timer (seconds): " << m_persistance_timer_seconds << std::endl;
 
 		std::cout << "Stats DB Server IP: " << strStatsDBServerIP << std::endl;
 		std::cout << "Stats DB Port: " << nStatsDBServerPort << std::endl;
@@ -79,7 +81,8 @@ namespace nexuspool
 		json j = json::parse(config_file);
 		j.at("wallet_ip").get_to(m_wallet_ip);
 		j.at("port").get_to(m_port);
-
+		j.at("pool_port").get_to(m_pool_port);
+		
 		j.at("connection_threads").get_to(m_connection_threads);
 		j.at("enable_ddos").get_to(m_use_ddos);
 		j.at("ddos_rscore").get_to(m_r_score);
@@ -90,8 +93,6 @@ namespace nexuspool
 		j.at("logfile").get_to(m_logfile);
 		j.at("database_type").get_to(m_database_type);
 		j.at("database_file").get_to(m_database_file);
-		j.at("maintenance_timer").get_to(m_maintenance_timer_seconds);
-		j.at("persistance_timer").get_to(m_persistance_timer_seconds);
 
 		j.at("stats_db_server_ip").get_to(strStatsDBServerIP);
 		j.at("stats_db_server_port").get_to(nStatsDBServerPort);
@@ -99,6 +100,17 @@ namespace nexuspool
 		j.at("stats_db_password").get_to(strStatsDBPassword);
 		j.at("connection_stats_frequency").get_to(nSaveConnectionStatsFrequency);
 		j.at("connection_stats_series_frequency").get_to(nSaveConnectionStatsSeriesFrequency);
+		
+		// advanced config
+		if (j.find("advanced_config") != j.end())
+		{
+			m_maintenance_timer_seconds = j["advanced_config"]["maintenance_timer"];
+			m_persistance_timer_seconds = j["advanced_config"]["persistance_timer"];
+			m_block_timer_milliseconds = j["advanced_config"]["block_timer_milliseconds"];
+			m_orphan_check_timer_seconds = j["advanced_config"]["orphan_check_timer"];
+			m_request_timer_seconds = j["advanced_config"]["request_timer"];
+		}
+
 
 		print_config();
 		// TODO Need to add exception handling here and set bSuccess appropriately

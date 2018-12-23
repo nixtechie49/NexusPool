@@ -48,7 +48,6 @@ namespace nexuspool
 		void new_round();
 		void add_block(LLP::CBlock const& block);
 
-
 	private:
 
 		void process_data(network::Shared_payload&& receive_buffer);

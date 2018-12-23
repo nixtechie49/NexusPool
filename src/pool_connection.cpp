@@ -75,12 +75,6 @@ network::Connection::Handler Pool_connection::init_connection_handler()
 
 void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 {
-	if ((*receive_buffer).size() < 5)
-	{
-		m_logger->error("Received too small buffer from Connection {0}. Size: {1}", m_remote_address, (*receive_buffer).size());
-		return;
-	}
-
 	Packet packet{ std::move(receive_buffer) };
 	if (!packet.is_valid())
 	{
@@ -90,6 +84,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		m_logger->error("Received packet is invalid, Connection: {}", m_remote_address);
 		return;
 	}
+	m_logger->debug("Received header: {0}", packet.m_header);
 	
 	ddos_invalid_header(packet);	// ddos ban for invalid received packets
 

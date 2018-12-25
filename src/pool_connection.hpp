@@ -45,7 +45,7 @@ namespace nexuspool
 		std::string const& get_remote_address() const { return m_remote_address; }	
 		std::string const& get_nxs_address() const { return m_nxsaddress; }	
 
-		void new_round();
+		void new_round(uint32_t new_height);
 		void add_block(LLP::CBlock const& block);
 
 	private:

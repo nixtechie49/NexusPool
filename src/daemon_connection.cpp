@@ -51,9 +51,9 @@ namespace nexuspool
 			else if (result == network::Result::connection_ok)
 			{
 				self->m_logger->info("Connection to wallet established");
-				self->m_maintenance_timer->start(chrono::Seconds(60), self->maintenance_timer_handler());
+			//	self->m_maintenance_timer->start(chrono::Seconds(60), self->maintenance_timer_handler());
 				self->m_block_timer->start(chrono::Milliseconds(50), self->block_timer_handler());
-			//	self->m_orphan_check_timer->start(chrono::Seconds(20), self->orphan_check_timer_handler());			
+				self->m_orphan_check_timer->start(chrono::Seconds(20), self->orphan_check_timer_handler());			
 				self->m_get_height_timer->start(chrono::Seconds(2), self->get_height_timer_handler());
 
 				// set channel
@@ -496,8 +496,7 @@ namespace nexuspool
 						if(pool_data.m_blocks_waiting > 0)
 						{
 							pool_data.m_blocks_waiting--;
-							m_logger->info("Daemon: Block Received Height = {0} Assigned to connection {1}", 
-											block.nHeight, pool_connection->get_remote_address());
+						//	m_logger->debug("Daemon: Block Received Height = {0} Assigned to connection {1}", block.nHeight, pool_connection->get_remote_address());
 
 							pool_connection->add_block(block);
 							return;
@@ -548,7 +547,7 @@ namespace nexuspool
 			{
 				continue;
 			}
-			pool_connection->new_round();
+			pool_connection->new_round(data_registry->m_best_height);
 		}
 	}
 

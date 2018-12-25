@@ -18,18 +18,25 @@ namespace nexuspool
 		enum
 		{
 			/** DATA PACKETS **/
-			LOGIN = 0,
-			BLOCK_DATA = 1,
-			SUBMIT_SHARE = 2,
+			BLOCK_DATA = 0,
+			SUBMIT_SHARE = 1,
+			BLOCK_HEIGHT = 2,
 			ACCOUNT_BALANCE = 3,
 			PENDING_PAYOUT = 4,
 			SUBMIT_PPS = 5,
+
+			//POOL RELATED
+			LOGIN = 8,
 
 			/** REQUEST PACKETS **/
 			GET_BLOCK = 129,
 			NEW_BLOCK = 130,
 			GET_BALANCE = 131,
 			GET_PAYOUT = 132,
+
+			//POOL RELATED _ SKMINER
+			LOGIN_SKMINER_SUCCESS = 134,
+			LOGIN_SKMINER_FAIL = 135,
 
 
 			/** RESPONSE PACKETS **/
@@ -104,6 +111,16 @@ namespace nexuspool
 		{
 			Packet packet;
 			packet.m_header = header;
+
+			return packet;
+		}
+
+		inline Packet get_height(uint32_t height) const
+		{
+			Packet packet;
+			packet.m_header = NEW_BLOCK; // on client mienrs often called GET_HEIGHT (same enum value)
+			packet.m_length = 4;
+			packet.m_data = std::make_shared<std::vector<uint8_t>>(uint2bytes(height));
 
 			return packet;
 		}

@@ -119,10 +119,10 @@ void Server::run()
 
 	m_listen_socket->listen(socket_handler);
 
-	//for (std::size_t i = 0; i < m_config.get_connection_threads(); ++i)
-	//{
-	//	m_io_threads.push_back(std::thread([io_context = m_io_context]() { io_context->run(); }));
-	//}
+	for (std::size_t i = 0; i < m_config.get_connection_threads(); ++i)
+	{
+		m_io_threads.push_back(std::thread([io_context = m_io_context]() { io_context->run(); }));
+	}
 
 	m_io_context->run();
 }

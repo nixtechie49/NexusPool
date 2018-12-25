@@ -46,6 +46,11 @@ network::Connection::Handler Pool_connection::init_connection_handler()
 			self->m_connection = nullptr;		// close connection (socket etc)
 			self->m_connection_closed = true;
 		}
+		else if(result == network::Result::connection_closed)
+		{
+			self->m_connection = nullptr;		// close connection (socket etc)
+			self->m_connection_closed = true;
+		}
 		else if (result == network::Result::connection_ok)
 		{
 			self->m_connection->remote_endpoint().address(self->m_remote_address);
@@ -84,7 +89,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		m_logger->error("Received packet is invalid, Connection: {}", m_remote_address);
 		return;
 	}
-	m_logger->debug("Received header: {0}", packet.m_header);
+//	m_logger->debug("Received header: {0}", packet.m_header);
 	
 	ddos_invalid_header(packet);	// ddos ban for invalid received packets
 
@@ -109,10 +114,14 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 		}
 
 		m_nxsaddress = bytes2string(*packet.m_data);
+		m_nxsaddress = std::string(packet.m_data->begin(), packet.m_data->end());
 		Core::NexusAddress cAddress(m_nxsaddress);
 
 		m_stats.m_address = m_nxsaddress;
 		//Core::STATSCOLLECTOR.IncConnectionCount(ADDRESS, GUID);
+
+		Packet login_fail_response;
+		login_fail_response = login_fail_response.get_packet(Packet::LOGIN_SKMINER_FAIL);		
 
 		if (!cAddress.IsValid())
 		{
@@ -120,6 +129,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			if (m_isDDOS)
 				m_ddos->Ban(m_logger, "Invalid Nexus Address on Login");
 
+			m_connection->transmit(login_fail_response.get_bytes());
 			return;
 		}
 
@@ -149,11 +159,14 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			m_ddos->Ban(m_logger, "Account is Banned");
 
 			m_logged_in = false;
-
+			m_connection->transmit(login_fail_response.get_bytes());
 		}
 		else
 		{
 			m_logged_in = true;
+			Packet login_success_response;
+			login_success_response = login_success_response.get_packet(Packet::LOGIN_SKMINER_SUCCESS);
+			m_connection->transmit(login_success_response.get_bytes());
 
 			//PS
 			// QUICK HACK these are google cloud and amazon AWS IP ranges which we should allow
@@ -266,7 +279,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			m_logger->info("Pool: Block Not Found {}", hashPrimeOrigin.ToString().substr(0, 30));
 
 			Packet response_block;
-			response_block = response_block.get_packet(Packet::NEW_BLOCK);
+			response_block = response_block.get_height(data_registry->m_best_height);
 			m_connection->transmit(response_block.get_bytes());
 			
 			if(m_isDDOS)
@@ -291,7 +304,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 			m_connection->transmit(response.get_bytes());
 
 			Packet response_block;
-			response_block = response_block.get_packet(Packet::NEW_BLOCK);
+			response_block = response_block.get_height(data_registry->m_best_height);
 			m_connection->transmit(response_block.get_bytes());
 			
 			/** Be Lenient on Stale Shares [But Still amplify score above normal 1 per request.] **/
@@ -382,7 +395,7 @@ void Pool_connection::process_data(network::Shared_payload&& receive_buffer)
 	}
 }
 
-void Pool_connection::new_round()
+void Pool_connection::new_round(uint32_t new_height)
 {
 	{
 		std::lock_guard<std::mutex> lk(m_primes_mutex);
@@ -397,12 +410,17 @@ void Pool_connection::new_round()
 
 	// respone to miner -> new block
 	Packet response_block;
-	response_block = response_block.get_packet(Packet::NEW_BLOCK);
+	response_block = response_block.get_height(new_height);
 	m_connection->transmit(response_block.get_bytes());
 }
 
 void Pool_connection::add_block(LLP::CBlock const& block)
 {
+	if (!m_connection)
+	{
+		return;
+	}
+
 	m_num_blocks_requested--;
 	{
 		std::lock_guard<std::mutex> lk(m_blocks_requested_mutex);
